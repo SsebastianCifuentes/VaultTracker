@@ -2,7 +2,7 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -10,6 +10,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [fileError, setFileError] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = useMemo(() => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -96,6 +101,36 @@ export default function DashboardPage() {
     } finally {
       setLoggingOut(false);
     }
+  }
+
+  function selectFile(selectedFile: File | undefined) {
+    if (!selectedFile) return;
+
+    const extension = selectedFile.name.split(".").pop()?.toLowerCase();
+    if (extension !== "csv" && extension !== "pdf") {
+      setFile(null);
+      setFileError("Formato no válido. Selecciona un archivo CSV o PDF.");
+      return;
+    }
+
+    setFile(selectedFile);
+    setFileError("");
+  }
+
+  function handleProcessFile() {
+    if (!file || isUploading) return;
+
+    setIsUploading(true);
+    console.log(file);
+    setIsUploading(false);
+  }
+
+  function formatFileSize(size: number) {
+    if (size >= 1024 * 1024) {
+      return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    return `${(size / 1024).toFixed(1)} KB`;
   }
 
   if (loading) {
@@ -206,38 +241,127 @@ export default function DashboardPage() {
           aria-labelledby="statements-title"
           className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl shadow-black/20 sm:p-10"
         >
-          <div className="mx-auto flex max-w-2xl flex-col items-center py-8 text-center sm:py-12">
-            <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-400">
-              <svg
-                aria-hidden="true"
-                className="h-7 w-7"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="1.7"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M7 3.75h7l4 4v12.5H7a2 2 0 0 1-2-2v-12.5a2 2 0 0 1 2-2Zm7 0v4h4m-9 4h6m-6 4h6"
-                />
-              </svg>
-            </div>
+          <div className="mx-auto max-w-3xl">
             <h2
               className="text-xl font-semibold text-white"
               id="statements-title"
             >
               Cartolas bancarias
             </h2>
-            <p className="mt-3 max-w-lg text-sm leading-6 text-slate-400">
-              Aquí podrás cargar tus cartolas para procesar y organizar tus
-              movimientos financieros. El módulo de carga estará disponible
-              próximamente.
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              Carga una cartola bancaria para preparar sus movimientos
+              financieros.
             </p>
-            <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1.5 text-xs font-medium text-slate-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Módulo en preparación
+
+            <input
+              accept=".csv,.pdf"
+              className="sr-only"
+              onChange={(event) => {
+                selectFile(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+              ref={fileInputRef}
+              type="file"
+            />
+
+            <div
+              className={`mt-6 rounded-xl border-2 border-dashed p-6 text-center transition-colors sm:p-10 ${
+                isDragging
+                  ? "border-emerald-500 bg-emerald-950/20"
+                  : "border-slate-700 bg-slate-950/40"
+              }`}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                setIsDragging(false);
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                setIsDragging(false);
+                selectFile(event.dataTransfer.files[0]);
+              }}
+            >
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-400">
+                <svg
+                  aria-hidden="true"
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14.5v3A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5v-3"
+                  />
+                </svg>
+              </div>
+              <p className="mt-4 text-sm font-medium text-slate-200">
+                Arrastra tu cartola y suéltala aquí
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Formatos admitidos: CSV o PDF
+              </p>
+              <button
+                className="mt-5 rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-emerald-500/50 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                onClick={() => fileInputRef.current?.click()}
+                type="button"
+              >
+                Seleccionar archivo
+              </button>
             </div>
+
+            {fileError && (
+              <p
+                aria-live="polite"
+                className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+                role="alert"
+              >
+                {fileError}
+              </p>
+            )}
+
+            {file && (
+              <div className="mt-5 flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-slate-200">
+                    {file.name}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatFileSize(file.size)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <button
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                    onClick={() => {
+                      setFile(null);
+                      setFileError("");
+                    }}
+                    type="button"
+                  >
+                    Descartar
+                  </button>
+                  <button
+                    className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isUploading}
+                    onClick={handleProcessFile}
+                    type="button"
+                  >
+                    {isUploading ? "Procesando..." : "Procesar Cartola"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <p className="mt-5 text-center text-xs text-slate-500">
+              El parser de cartolas se conectará aquí en el siguiente paso.
+            </p>
           </div>
         </section>
       </main>
