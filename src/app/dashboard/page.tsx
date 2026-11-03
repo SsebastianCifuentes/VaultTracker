@@ -3,6 +3,11 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  parseBankCSV,
+  parseSantanderPDF,
+  type TransactionItem,
+} from "@/lib/bankParser";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -14,6 +19,9 @@ export default function DashboardPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [fileError, setFileError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [parsedTransactions, setParsedTransactions] = useState<
+    TransactionItem[]
+  >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const supabase = useMemo(() => {
@@ -109,20 +117,51 @@ export default function DashboardPage() {
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
     if (extension !== "csv" && extension !== "pdf") {
       setFile(null);
+      setParsedTransactions([]);
       setFileError("Formato no válido. Selecciona un archivo CSV o PDF.");
       return;
     }
 
     setFile(selectedFile);
     setFileError("");
+    setParsedTransactions([]);
   }
 
-  function handleProcessFile() {
+  async function handleProcessFile() {
     if (!file || isUploading) return;
 
     setIsUploading(true);
-    console.log(file);
-    setIsUploading(false);
+    setFileError("");
+    setParsedTransactions([]);
+
+    try {
+      let transactions: TransactionItem[];
+
+      if (file.name.toLowerCase().endsWith(".csv")) {
+        const fileContent = await file.text();
+        transactions = parseBankCSV(fileContent);
+      } else {
+        transactions = await parseSantanderPDF(
+          new Uint8Array(await file.arrayBuffer()),
+        );
+      }
+
+      setParsedTransactions(transactions);
+
+      if (transactions.length === 0) {
+        setFileError(
+          "No se encontraron transacciones válidas. Revisa el formato de la cartola.",
+        );
+      }
+    } catch (error) {
+      setFileError(
+        error instanceof Error
+          ? error.message
+          : "Ocurrió un error al procesar el archivo.",
+      );
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   function formatFileSize(size: number) {
@@ -132,6 +171,22 @@ export default function DashboardPage() {
 
     return `${(size / 1024).toFixed(1)} KB`;
   }
+
+  function formatCurrency(amount: number) {
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+
+  const totalExpenses = parsedTransactions
+    .filter((transaction) => transaction.type === "EXPENSE")
+    .reduce((total, transaction) => total + transaction.amount, 0);
+  const totalIncome = parsedTransactions
+    .filter((transaction) => transaction.type === "INCOME")
+    .reduce((total, transaction) => total + transaction.amount, 0);
+  const netBalance = totalIncome - totalExpenses;
 
   if (loading) {
     return (
@@ -342,6 +397,7 @@ export default function DashboardPage() {
                     onClick={() => {
                       setFile(null);
                       setFileError("");
+                      setParsedTransactions([]);
                     }}
                     type="button"
                   >
@@ -360,8 +416,139 @@ export default function DashboardPage() {
             )}
 
             <p className="mt-5 text-center text-xs text-slate-500">
-              El parser de cartolas se conectará aquí en el siguiente paso.
+              Las cartolas CSV y PDF de Banco Santander se procesan localmente
+              para mostrar una vista previa.
             </p>
+
+            {parsedTransactions.length > 0 && (
+              <section
+                aria-labelledby="transactions-title"
+                className="mt-10"
+              >
+                <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h3
+                      className="text-lg font-semibold text-white"
+                      id="transactions-title"
+                    >
+                      Vista previa de transacciones
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {parsedTransactions.length}{" "}
+                      {parsedTransactions.length === 1
+                        ? "transacción encontrada"
+                        : "transacciones encontradas"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
+                    <p className="text-xs font-medium text-rose-300">
+                      Total Gastos
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-rose-200">
+                      {formatCurrency(totalExpenses)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                    <p className="text-xs font-medium text-emerald-300">
+                      Total Pagos
+                    </p>
+                    <p className="mt-2 text-lg font-semibold text-emerald-200">
+                      {formatCurrency(totalIncome)}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
+                    <p className="text-xs font-medium text-slate-400">
+                      Balance Net
+                    </p>
+                    <p
+                      className={`mt-2 text-lg font-semibold ${
+                        netBalance < 0 ? "text-rose-200" : "text-white"
+                      }`}
+                    >
+                      {formatCurrency(netBalance)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-800">
+                  <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
+                    <thead className="bg-slate-950/70 text-xs uppercase tracking-wide text-slate-400">
+                      <tr>
+                        <th className="px-4 py-3 font-medium" scope="col">
+                          Fecha
+                        </th>
+                        <th className="px-4 py-3 font-medium" scope="col">
+                          Descripción
+                        </th>
+                        <th className="px-4 py-3 font-medium" scope="col">
+                          Tipo
+                        </th>
+                        <th
+                          className="px-4 py-3 text-right font-medium"
+                          scope="col"
+                        >
+                          Monto
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 bg-slate-900">
+                      {parsedTransactions.map((transaction, index) => (
+                        <tr
+                          className="text-slate-300"
+                          key={`${transaction.date}-${index}`}
+                        >
+                          <td className="whitespace-nowrap px-4 py-3 text-slate-400">
+                            {transaction.date}
+                          </td>
+                          <td className="min-w-48 px-4 py-3">
+                            {transaction.description}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                                transaction.type === "INCOME"
+                                  ? "bg-emerald-500/10 text-emerald-300"
+                                  : "bg-rose-500/10 text-rose-300"
+                              }`}
+                            >
+                              {transaction.type === "INCOME"
+                                ? "Abono / Pago"
+                                : "Compra / Gasto"}
+                            </span>
+                          </td>
+                          <td
+                            className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
+                              transaction.type === "EXPENSE"
+                                ? "text-rose-300"
+                                : "text-emerald-300"
+                            }`}
+                          >
+                            {formatCurrency(transaction.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-5 flex flex-col items-start gap-2 sm:items-end">
+                  <button
+                    className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white opacity-60"
+                    disabled
+                    title="La integración de guardado en base de datos aún no está configurada."
+                    type="button"
+                  >
+                    Guardar en Base de Datos
+                  </button>
+                  <p className="text-xs text-slate-500">
+                    El guardado en base de datos aún no está configurado.
+                  </p>
+                </div>
+              </section>
+            )}
           </div>
         </section>
       </main>
