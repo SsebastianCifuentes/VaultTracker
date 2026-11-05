@@ -19,6 +19,11 @@ export default function DashboardPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [fileError, setFileError] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
   const [parsedTransactions, setParsedTransactions] = useState<
     TransactionItem[]
   >([]);
@@ -111,6 +116,81 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleSaveToDatabase() {
+    if (!supabase) {
+      setSaveMessage({
+        type: "error",
+        text: "Falta configurar la conexión con Supabase.",
+      });
+      return;
+    }
+
+    if (parsedTransactions.length === 0 || isSaving) return;
+
+    setIsSaving(true);
+    setSaveMessage(null);
+
+    try {
+      const { data, error: userError } = await supabase.auth.getUser();
+
+      if (userError) {
+        setSaveMessage({
+          type: "error",
+          text: `No se pudo verificar tu sesión: ${userError.message}`,
+        });
+        return;
+      }
+
+      if (!data.user) {
+        setSaveMessage({
+          type: "error",
+          text: "Tu sesión expiró. Inicia sesión nuevamente para guardar.",
+        });
+        router.replace("/login");
+        return;
+      }
+
+      const dataToInsert = parsedTransactions.map((transaction) => ({
+        ...transaction,
+        user_id: data.user.id,
+      }));
+      const { error: insertError } = await supabase
+        .from("transactions")
+        .insert(dataToInsert);
+
+      if (insertError) {
+        setSaveMessage({
+          type: "error",
+          text: `No se pudieron guardar las transacciones: ${insertError.message}`,
+        });
+        return;
+      }
+
+      setParsedTransactions([]);
+      setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      setFileError("");
+      setSaveMessage({
+        type: "success",
+        text: `${dataToInsert.length} ${
+          dataToInsert.length === 1 ? "transacción guardada" : "transacciones guardadas"
+        } correctamente en tu cuenta.`,
+      });
+    } catch (error) {
+      setSaveMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? `No se pudieron guardar las transacciones: ${error.message}`
+            : "Ocurrió un error inesperado al guardar las transacciones.",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   function selectFile(selectedFile: File | undefined) {
     if (!selectedFile) return;
 
@@ -119,12 +199,14 @@ export default function DashboardPage() {
       setFile(null);
       setParsedTransactions([]);
       setFileError("Formato no válido. Selecciona un archivo CSV o PDF.");
+      setSaveMessage(null);
       return;
     }
 
     setFile(selectedFile);
     setFileError("");
     setParsedTransactions([]);
+    setSaveMessage(null);
   }
 
   async function handleProcessFile() {
@@ -132,6 +214,7 @@ export default function DashboardPage() {
 
     setIsUploading(true);
     setFileError("");
+    setSaveMessage(null);
     setParsedTransactions([]);
 
     try {
@@ -289,6 +372,20 @@ export default function DashboardPage() {
             role="alert"
           >
             {errorMsg}
+          </p>
+        )}
+
+        {saveMessage && (
+          <p
+            aria-live="polite"
+            className={`mb-6 rounded-lg border px-4 py-3 text-sm ${
+              saveMessage.type === "success"
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                : "border-rose-500/30 bg-rose-500/10 text-rose-300"
+            }`}
+            role={saveMessage.type === "success" ? "status" : "alert"}
+          >
+            {saveMessage.text}
           </p>
         )}
 
@@ -536,16 +633,13 @@ export default function DashboardPage() {
 
                 <div className="mt-5 flex flex-col items-start gap-2 sm:items-end">
                   <button
-                    className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white opacity-60"
-                    disabled
-                    title="La integración de guardado en base de datos aún no está configurada."
+                    className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={isSaving}
+                    onClick={() => void handleSaveToDatabase()}
                     type="button"
                   >
-                    Guardar en Base de Datos
+                    {isSaving ? "Guardando..." : "Guardar en Base de Datos"}
                   </button>
-                  <p className="text-xs text-slate-500">
-                    El guardado en base de datos aún no está configurado.
-                  </p>
                 </div>
               </section>
             )}
