@@ -3,6 +3,66 @@ export interface TransactionItem {
   description: string;
   amount: number;
   type: "INCOME" | "EXPENSE";
+  category: string;
+}
+
+export const TRANSACTION_CATEGORIES = [
+  "Ocio",
+  "Restaurantes",
+  "Supermercado",
+  "Transporte",
+  "Compras",
+  "Pagos",
+  "Otros",
+] as const;
+
+export function assignAutoCategory(description: string): string {
+  const normalizedDescription = description
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const categoryKeywords: Array<[string, string[]]> = [
+    ["Ocio", ["Cinemark", "Ticketmaster", "Steam", "Juegos"]],
+    [
+      "Restaurantes",
+      ["Uber Eats", "KFC", "McDonald", "Coffee", "Dulceria", "Sandoz", "Rocket"],
+    ],
+    ["Supermercado", ["Jumbo", "Santa Isabel", "Lider", "Hiper"]],
+    [
+      "Transporte",
+      ["Uber", "Didi", "Copec", "Efe_Valpo", "Pasajebus", "Autopista"],
+    ],
+    ["Pagos", ["Monto Cancelado", "Traspaso"]],
+    [
+      "Compras",
+      [
+        "Falabella",
+        "Ali-express",
+        "Shein",
+        "Mercadopago",
+        "Casa Ideas",
+        "Sodimac",
+        "Easy",
+      ],
+    ],
+  ];
+
+  for (const [category, keywords] of categoryKeywords) {
+    if (
+      keywords.some((keyword) =>
+        normalizedDescription.includes(
+          keyword
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase(),
+        ),
+      )
+    ) {
+      return category;
+    }
+  }
+
+  return "Otros";
 }
 
 function splitCSVLine(line: string, delimiter: string): string[] {
@@ -186,6 +246,7 @@ export function parseBankCSV(csvText: string): TransactionItem[] {
           isIncomeColumn || (!isExpenseColumn && parsedAmount.isCredit)
             ? "INCOME"
             : "EXPENSE",
+        category: assignAutoCategory(description),
       },
     ];
   });
@@ -290,6 +351,7 @@ export function parseSantanderPDFText(text: string): TransactionItem[] {
       description,
       amount: parsedAmount.amount,
       type: isIncome ? "INCOME" : "EXPENSE",
+      category: assignAutoCategory(description),
     });
   }
 

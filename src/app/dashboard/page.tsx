@@ -2,19 +2,84 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  assignAutoCategory,
   parseBankCSV,
   parseSantanderPDF,
+  TRANSACTION_CATEGORIES,
   type TransactionItem,
 } from "@/lib/bankParser";
+
+interface SavedTransaction extends TransactionItem {
+  id?: string | number;
+}
+
+function isTransactionCategory(
+  category: unknown,
+): category is (typeof TRANSACTION_CATEGORIES)[number] {
+  return (
+    typeof category === "string" &&
+    TRANSACTION_CATEGORIES.some((option) => option === category)
+  );
+}
+
+function CategorySpendingBreakdown({
+  transactions,
+  formatCurrency,
+}: {
+  transactions: Pick<TransactionItem, "amount" | "category" | "type">[];
+  formatCurrency: (amount: number) => string;
+}) {
+  return (
+    <div className="mb-5">
+      <h4 className="mb-3 text-xs font-medium text-slate-400">
+        Gastos por categoría
+      </h4>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+        {TRANSACTION_CATEGORIES.map((category) => {
+          const total = transactions
+            .filter(
+              (transaction) =>
+                transaction.type === "EXPENSE" &&
+                transaction.category === category,
+            )
+            .reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+
+          return (
+            <div
+              className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"
+              key={category}
+            >
+              <p className="truncate text-[11px] text-slate-500">{category}</p>
+              <p className="mt-1 truncate text-sm font-medium text-slate-200">
+                {formatCurrency(total)}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [savedTransactions, setSavedTransactions] = useState<
+    SavedTransaction[]
+  >([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [historyError, setHistoryError] = useState("");
+  const [categoryError, setCategoryError] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
+  const [savingCategoryId, setSavingCategoryId] = useState<
+    string | number | null
+  >(null);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [fileError, setFileError] = useState("");
@@ -39,6 +104,32 @@ export default function DashboardPage() {
 
     return createBrowserClient(supabaseUrl, supabaseAnonKey);
   }, []);
+
+  const fetchSavedTransactions = useCallback(
+    async (currentUserId: string) => {
+      if (!supabase) {
+        throw new Error("Falta configurar la conexión con Supabase.");
+      }
+
+      const { data, error } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", currentUserId)
+        .order("date", { ascending: false });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return (data ?? []).map((transaction) => ({
+        ...transaction,
+        category: isTransactionCategory(transaction.category)
+          ? transaction.category
+          : assignAutoCategory(transaction.description),
+      })) as SavedTransaction[];
+    },
+    [supabase],
+  );
 
   useEffect(() => {
     let active = true;
@@ -66,6 +157,7 @@ export default function DashboardPage() {
           return;
         }
 
+        setUserId(data.user.id);
         setUserEmail(data.user.email ?? null);
         setLoading(false);
       } catch (error) {
@@ -86,6 +178,41 @@ export default function DashboardPage() {
       active = false;
     };
   }, [router, supabase]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const currentUserId = userId;
+    let active = true;
+
+    async function loadHistory() {
+      try {
+        const transactions = await fetchSavedTransactions(currentUserId);
+        if (!active) return;
+
+        setHistoryError("");
+        setSavedTransactions(transactions);
+      } catch (error) {
+        if (!active) return;
+
+        setHistoryError(
+          error instanceof Error
+            ? `No se pudo cargar el historial: ${error.message}`
+            : "Ocurrió un error inesperado al cargar el historial.",
+        );
+      } finally {
+        if (active) {
+          setIsLoadingHistory(false);
+        }
+      }
+    }
+
+    void loadHistory();
+
+    return () => {
+      active = false;
+    };
+  }, [fetchSavedTransactions, userId]);
 
   async function handleLogout() {
     if (!supabase) {
@@ -113,6 +240,55 @@ export default function DashboardPage() {
       );
     } finally {
       setLoggingOut(false);
+    }
+  }
+
+  async function handleSavedCategoryChange(
+    transaction: SavedTransaction,
+    category: string,
+  ) {
+    if (category === transaction.category) return;
+
+    if (!supabase || !userId || transaction.id === undefined) {
+      setCategoryError(
+        "No se pudo actualizar la categoría de este movimiento.",
+      );
+      return;
+    }
+
+    setSavingCategoryId(transaction.id);
+    setCategoryError("");
+
+    try {
+      const { error } = await supabase
+        .from("transactions")
+        .update({ category })
+        .eq("id", transaction.id)
+        .eq("user_id", userId);
+
+      if (error) {
+        setCategoryError(
+          `No se pudo actualizar la categoría: ${error.message}`,
+        );
+        return;
+      }
+
+      setCategoryError("");
+      setSavedTransactions((currentTransactions) =>
+        currentTransactions.map((savedTransaction) =>
+          savedTransaction.id === transaction.id
+            ? { ...savedTransaction, category }
+            : savedTransaction,
+        ),
+      );
+    } catch (error) {
+      setCategoryError(
+        error instanceof Error
+          ? `No se pudo actualizar la categoría: ${error.message}`
+          : "Ocurrió un error inesperado al actualizar la categoría.",
+      );
+    } finally {
+      setSavingCategoryId(null);
     }
   }
 
@@ -152,6 +328,7 @@ export default function DashboardPage() {
 
       const dataToInsert = parsedTransactions.map((transaction) => ({
         ...transaction,
+        category: transaction.category,
         user_id: data.user.id,
       }));
       const { error: insertError } = await supabase
@@ -166,6 +343,20 @@ export default function DashboardPage() {
         return;
       }
 
+      setIsLoadingHistory(true);
+      try {
+        const transactions = await fetchSavedTransactions(data.user.id);
+        setHistoryError("");
+        setSavedTransactions(transactions);
+      } catch (error) {
+        setHistoryError(
+          error instanceof Error
+            ? `No se pudo cargar el historial: ${error.message}`
+            : "Ocurrió un error inesperado al cargar el historial.",
+        );
+      } finally {
+        setIsLoadingHistory(false);
+      }
       setParsedTransactions([]);
       setFile(null);
       if (fileInputRef.current) {
@@ -270,6 +461,18 @@ export default function DashboardPage() {
     .filter((transaction) => transaction.type === "INCOME")
     .reduce((total, transaction) => total + transaction.amount, 0);
   const netBalance = totalIncome - totalExpenses;
+  const savedTotalExpenses = savedTransactions
+    .filter((transaction) => transaction.type === "EXPENSE")
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
+  const savedTotalIncome = savedTransactions
+    .filter((transaction) => transaction.type === "INCOME")
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
+  const savedNetBalance = savedTotalIncome - savedTotalExpenses;
+  const filteredSavedTransactions = savedTransactions.filter((transaction) =>
+    transaction.description
+      .toLocaleLowerCase("es")
+      .includes(historySearch.trim().toLocaleLowerCase("es")),
+  );
 
   if (loading) {
     return (
@@ -570,6 +773,11 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
+                <CategorySpendingBreakdown
+                  formatCurrency={formatCurrency}
+                  transactions={parsedTransactions}
+                />
+
                 <div className="overflow-x-auto rounded-xl border border-slate-800">
                   <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
                     <thead className="bg-slate-950/70 text-xs uppercase tracking-wide text-slate-400">
@@ -579,6 +787,9 @@ export default function DashboardPage() {
                         </th>
                         <th className="px-4 py-3 font-medium" scope="col">
                           Descripción
+                        </th>
+                        <th className="px-4 py-3 font-medium" scope="col">
+                          Categoría
                         </th>
                         <th className="px-4 py-3 font-medium" scope="col">
                           Tipo
@@ -602,6 +813,30 @@ export default function DashboardPage() {
                           </td>
                           <td className="min-w-48 px-4 py-3">
                             {transaction.description}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <select
+                              aria-label={`Categoría de ${transaction.description}`}
+                              className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                              onChange={(event) => {
+                                const category = event.target.value;
+                                setParsedTransactions((currentTransactions) =>
+                                  currentTransactions.map(
+                                    (currentTransaction, currentIndex) =>
+                                      currentIndex === index
+                                        ? { ...currentTransaction, category }
+                                        : currentTransaction,
+                                  ),
+                                );
+                              }}
+                              value={transaction.category}
+                            >
+                              {TRANSACTION_CATEGORIES.map((category) => (
+                                <option key={category} value={category}>
+                                  {category}
+                                </option>
+                              ))}
+                            </select>
                           </td>
                           <td className="whitespace-nowrap px-4 py-3">
                             <span
@@ -644,6 +879,258 @@ export default function DashboardPage() {
               </section>
             )}
           </div>
+        </section>
+
+        <section
+          aria-labelledby="history-title"
+          className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl shadow-black/20 sm:p-10"
+        >
+          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-emerald-400">
+                Tus movimientos
+              </p>
+              <h2
+                className="mt-1 text-xl font-semibold text-white"
+                id="history-title"
+              >
+                Historial de Movimientos
+              </h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Consulta las transacciones guardadas en tu cuenta.
+              </p>
+            </div>
+            {savedTransactions.length > 0 && (
+              <p className="text-xs text-slate-500">
+                {savedTransactions.length}{" "}
+                {savedTransactions.length === 1
+                  ? "movimiento guardado"
+                  : "movimientos guardados"}
+              </p>
+            )}
+          </div>
+
+          {historyError && (
+            <p
+              aria-live="polite"
+              className="mb-5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+              role="alert"
+            >
+              {historyError}
+            </p>
+          )}
+
+          {categoryError && (
+            <p
+              aria-live="polite"
+              className="mb-5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+              role="alert"
+            >
+              {categoryError}
+            </p>
+          )}
+
+          {isLoadingHistory ? (
+            <div
+              aria-label="Cargando historial"
+              className="flex min-h-40 items-center justify-center"
+              role="status"
+            >
+              <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-700 border-t-emerald-500" />
+            </div>
+          ) : !historyError && savedTransactions.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 px-5 py-12 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-400">
+                <svg
+                  aria-hidden="true"
+                  className="h-6 w-6"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.6"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M5 5.75A2.75 2.75 0 0 1 7.75 3h8.5A2.75 2.75 0 0 1 19 5.75v12.5A2.75 2.75 0 0 1 16.25 21h-8.5A2.75 2.75 0 0 1 5 18.25V5.75Z" />
+                  <path d="M8.5 8h7M8.5 12h7M8.5 16h4" />
+                </svg>
+              </div>
+              <h3 className="mt-4 text-sm font-semibold text-slate-200">
+                Aún no tienes movimientos guardados
+              </h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                Importa y guarda una cartola bancaria para consultar aquí tus
+                transacciones.
+              </p>
+            </div>
+          ) : !historyError ? (
+            <>
+              <div className="mb-6 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
+                  <p className="text-xs font-medium text-rose-300">
+                    Total Gastos
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-rose-200">
+                    {formatCurrency(savedTotalExpenses)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+                  <p className="text-xs font-medium text-emerald-300">
+                    Total Pagos/Abonos
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-emerald-200">
+                    {formatCurrency(savedTotalIncome)}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
+                  <p className="text-xs font-medium text-slate-400">
+                    Balance General
+                  </p>
+                  <p
+                    className={`mt-2 text-lg font-semibold ${
+                      savedNetBalance < 0 ? "text-rose-200" : "text-white"
+                    }`}
+                  >
+                    {formatCurrency(savedNetBalance)}
+                  </p>
+                </div>
+              </div>
+
+              <CategorySpendingBreakdown
+                formatCurrency={formatCurrency}
+                transactions={savedTransactions}
+              />
+
+              <label className="mb-4 block">
+                <span className="sr-only">
+                  Buscar transacción por descripción
+                </span>
+                <span className="relative block">
+                  <svg
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.8"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle cx="10.8" cy="10.8" r="6.8" />
+                    <path d="m16 16 4.5 4.5" />
+                  </svg>
+                  <input
+                    className="w-full rounded-lg border border-slate-800 bg-slate-950/70 py-3 pl-10 pr-4 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    onChange={(event) => setHistorySearch(event.target.value)}
+                    placeholder="Buscar por descripción..."
+                    type="search"
+                    value={historySearch}
+                  />
+                </span>
+              </label>
+
+              <div className="max-h-[28rem] overflow-auto rounded-xl border border-slate-800">
+                <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
+                  <thead className="sticky top-0 bg-slate-950 text-xs uppercase tracking-wide text-slate-400">
+                    <tr>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium" scope="col">
+                        Fecha
+                      </th>
+                      <th className="px-4 py-3 font-medium" scope="col">
+                        Descripción
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium" scope="col">
+                        Categoría
+                      </th>
+                      <th className="whitespace-nowrap px-4 py-3 font-medium" scope="col">
+                        Tipo
+                      </th>
+                      <th
+                        className="whitespace-nowrap px-4 py-3 text-right font-medium"
+                        scope="col"
+                      >
+                        Monto
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 bg-slate-900">
+                    {filteredSavedTransactions.map((transaction, index) => (
+                      <tr
+                        className="text-slate-300"
+                        key={
+                          transaction.id ??
+                          `${transaction.date}-${transaction.description}-${index}`
+                        }
+                      >
+                        <td className="whitespace-nowrap px-4 py-3 text-slate-400">
+                          {transaction.date}
+                        </td>
+                        <td className="min-w-48 px-4 py-3">
+                          {transaction.description}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <select
+                            aria-label={`Categoría de ${transaction.description}`}
+                            className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-wait disabled:opacity-60"
+                            disabled={savingCategoryId !== null}
+                            onChange={(event) =>
+                              void handleSavedCategoryChange(
+                                transaction,
+                                event.target.value,
+                              )
+                            }
+                            value={
+                              isTransactionCategory(transaction.category)
+                                ? transaction.category
+                                : assignAutoCategory(transaction.description)
+                            }
+                          >
+                            {TRANSACTION_CATEGORIES.map((category) => (
+                              <option key={category} value={category}>
+                                {category}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                              transaction.type === "INCOME"
+                                ? "bg-emerald-500/10 text-emerald-300"
+                                : "bg-rose-500/10 text-rose-300"
+                            }`}
+                          >
+                            {transaction.type === "INCOME"
+                              ? "Abono / Pago"
+                              : "Compra / Gasto"}
+                          </span>
+                        </td>
+                        <td
+                          className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
+                            transaction.type === "EXPENSE"
+                              ? "text-rose-300"
+                              : "text-emerald-300"
+                          }`}
+                        >
+                          {formatCurrency(Number(transaction.amount))}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredSavedTransactions.length === 0 && (
+                      <tr>
+                        <td
+                          className="px-4 py-8 text-center text-sm text-slate-500"
+                          colSpan={5}
+                        >
+                          No hay movimientos que coincidan con la búsqueda.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : null}
         </section>
       </main>
     </div>
