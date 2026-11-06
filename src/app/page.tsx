@@ -4,231 +4,110 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
-  ArrowDownRight,
-  ArrowUpRight,
-  CalendarClock,
-  CircleCheck,
-  CircleX,
-  Wallet,
+  ArrowRight,
+  Check,
+  CreditCard,
+  FileUp,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
-import {
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-} from "recharts";
 
-type DemoCategory =
-  | "Viajes"
-  | "Ocio"
-  | "Supermercado"
-  | "Restaurantes"
-  | "Transporte"
-  | "Vivienda/Gastos Comunes"
-  | "Pagos";
+type MovementCategory = "Comida" | "Supermercado" | "Transporte" | "Ingresos";
+type CategoryFilter = "Todos" | MovementCategory;
 
-interface DemoTransaction {
+interface Movement {
   id: number;
+  merchant: string;
+  initial: string;
   date: string;
-  description: string;
+  detail: string;
   amount: number;
-  type: "INCOME" | "EXPENSE";
-  category: DemoCategory;
+  category: MovementCategory;
+  kind: "income" | "expense";
+  logoClass: string;
 }
 
-type RecurringChargeStatus = "upcoming" | "paid" | "ignored";
-
-interface RecurringCharge {
-  id: number;
-  name: string;
-  amount: number;
-  daysUntilDue: number;
-  category: DemoCategory;
-  status: RecurringChargeStatus;
-}
-
-const demoCategories: DemoCategory[] = [
-  "Viajes",
-  "Ocio",
-  "Supermercado",
-  "Restaurantes",
-  "Transporte",
-  "Vivienda/Gastos Comunes",
-  "Pagos",
-];
-
-const categoryEmojis: Record<DemoCategory, string> = {
-  Viajes: "✈️",
-  Ocio: "🎬",
-  Supermercado: "🛒",
-  Restaurantes: "🍔",
-  Transporte: "🚗",
-  "Vivienda/Gastos Comunes": "🏠",
-  Pagos: "💸",
-};
-
-const initialRecurringCharges: RecurringCharge[] = [
-  {
-    id: 101,
-    name: "Spotify",
-    amount: 5490,
-    daysUntilDue: 3,
-    category: "Ocio",
-    status: "upcoming",
-  },
-  {
-    id: 102,
-    name: "Arriendo",
-    amount: 520000,
-    daysUntilDue: 12,
-    category: "Vivienda/Gastos Comunes",
-    status: "upcoming",
-  },
-  {
-    id: 103,
-    name: "Netflix",
-    amount: 8990,
-    daysUntilDue: 6,
-    category: "Ocio",
-    status: "upcoming",
-  },
-];
-
-const demoColors: Record<DemoCategory, string> = {
-  Viajes: "#0d9488",
-  Ocio: "#8b5cf6",
-  Supermercado: "#34d399",
-  Restaurantes: "#2dd4bf",
-  Transporte: "#06b6d4",
-  "Vivienda/Gastos Comunes": "#10b981",
-  Pagos: "#059669",
-};
-
-const initialDemoTransactions: DemoTransaction[] = [
+const movements: Movement[] = [
   {
     id: 1,
-    date: "06 nov",
-    description: "Air Canada · pasaje",
-    amount: 248900,
-    type: "EXPENSE",
-    category: "Viajes",
+    merchant: "McDonald's",
+    initial: "M",
+    date: "Hoy, 12:42",
+    detail: "Restaurante · Tarjeta débito",
+    amount: -8990,
+    category: "Comida",
+    kind: "expense",
+    logoClass: "bg-[#da291c] text-white",
   },
   {
     id: 2,
-    date: "05 nov",
-    description: "Uber · viaje a casa",
-    amount: 8900,
-    type: "EXPENSE",
-    category: "Transporte",
+    merchant: "Starbucks",
+    initial: "S",
+    date: "Ayer, 09:18",
+    detail: "Cafetería · Tarjeta débito",
+    amount: -5490,
+    category: "Comida",
+    kind: "expense",
+    logoClass: "bg-[#00754a] text-white",
   },
   {
     id: 3,
-    date: "04 nov",
-    description: "Jumbo · compra semanal",
-    amount: 58450,
-    type: "EXPENSE",
+    merchant: "Lider",
+    initial: "L",
+    date: "Ayer, 18:07",
+    detail: "Supermercado · Tarjeta crédito",
+    amount: -62490,
     category: "Supermercado",
+    kind: "expense",
+    logoClass: "bg-[#0874c9] text-white",
   },
   {
     id: 4,
-    date: "03 nov",
-    description: "Copec · combustible",
-    amount: 42000,
-    type: "EXPENSE",
+    merchant: "Uber",
+    initial: "U",
+    date: "05 nov, 20:31",
+    detail: "Transporte · Tarjeta débito",
+    amount: -7350,
     category: "Transporte",
+    kind: "expense",
+    logoClass: "border border-slate-200 bg-slate-100 text-slate-800",
   },
   {
     id: 5,
-    date: "02 nov",
-    description: "Uber Eats · almuerzo",
-    amount: 18400,
-    type: "EXPENSE",
-    category: "Restaurantes",
-  },
-  {
-    id: 6,
-    date: "01 nov",
-    description: "Abono de sueldo",
+    merchant: "Abono de sueldo",
+    initial: "A",
+    date: "01 nov, 08:02",
+    detail: "Ingreso · Cuenta corriente",
     amount: 1250000,
-    type: "INCOME",
-    category: "Pagos",
-  },
-  {
-    id: 7,
-    date: "31 oct",
-    description: "Cinemark · entradas",
-    amount: 14500,
-    type: "EXPENSE",
-    category: "Ocio",
-  },
-  {
-    id: 8,
-    date: "30 oct",
-    description: "Enel · cuenta de luz",
-    amount: 32800,
-    type: "EXPENSE",
-    category: "Vivienda/Gastos Comunes",
-  },
-  {
-    id: 9,
-    date: "29 oct",
-    description: "Restaurante Sandoz",
-    amount: 26700,
-    type: "EXPENSE",
-    category: "Restaurantes",
+    category: "Ingresos",
+    kind: "income",
+    logoClass: "bg-emerald-100 text-emerald-700",
   },
 ];
 
-const features = [
-  {
-    number: "01",
-    title: "Parseo inteligente",
-    description:
-      "Importa cartolas PDF y archivos CSV de Banco Santander. VaultTracker organiza tus movimientos para que no tengas que hacerlo a mano.",
-    icon: (
-      <>
-        <path d="M7 3.75h7.5L19 8.25v12A1.75 1.75 0 0 1 17.25 22h-10A1.75 1.75 0 0 1 5.5 20.25V5.5A1.75 1.75 0 0 1 7.25 3.75Z" />
-        <path d="M14 4v5h5M8.5 13h7M8.5 16.5h7" />
-      </>
-    ),
-  },
-  {
-    number: "02",
-    title: "Seguridad de grado bancario",
-    description:
-      "Tus archivos se procesan en el navegador y tus transacciones se guardan de forma segura en Supabase, asociadas a tu cuenta.",
-    icon: (
-      <>
-        <path d="M12 3.5 19 6v5.75c0 4.25-2.85 7.3-7 8.75-4.15-1.45-7-4.5-7-8.75V6l7-2.5Z" />
-        <path d="m9 12 2 2 4-4" />
-      </>
-    ),
-  },
-  {
-    number: "03",
-    title: "Métricas en un vistazo",
-    description:
-      "Entiende tus finanzas con un resumen claro de ingresos, gastos y balance neto a partir de tus movimientos.",
-    icon: (
-      <>
-        <path d="M4.5 19.5V12M10.5 19.5V5M16.5 19.5v-9M22.5 19.5H2" />
-        <path d="m3.5 9 5-4 5 4 7-6" />
-      </>
-    ),
-  },
+const filters: CategoryFilter[] = [
+  "Todos",
+  "Comida",
+  "Supermercado",
+  "Transporte",
+  "Ingresos",
 ];
 
-function BrandMark({ small = false }: { small?: boolean }) {
+const banks = [
+  { name: "Santander", initial: "S", style: "bg-[#ec0000] text-white" },
+  { name: "Banco de Chile", initial: "CH", style: "bg-slate-100 text-slate-500" },
+  { name: "BancoEstado", initial: "BE", style: "bg-slate-100 text-slate-500" },
+  { name: "Bci", initial: "Bci", style: "bg-slate-100 text-slate-500" },
+  { name: "Scotiabank", initial: "S", style: "bg-slate-100 text-slate-500" },
+  { name: "Falabella", initial: "F", style: "bg-slate-100 text-slate-500" },
+];
+
+function BrandMark() {
   return (
-    <span
-      className={`flex items-center justify-center rounded-xl bg-emerald-600 shadow-sm shadow-emerald-900/10 ${
-        small ? "h-9 w-9" : "h-11 w-11"
-      }`}
-    >
+    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500 shadow-sm shadow-emerald-900/10">
       <svg
         aria-hidden="true"
-        className={small ? "h-8 w-8" : "h-10 w-10"}
+        className="h-9 w-9"
         fill="none"
         stroke="white"
         strokeLinecap="round"
@@ -236,9 +115,7 @@ function BrandMark({ small = false }: { small?: boolean }) {
         strokeWidth="3.5"
         viewBox="0 0 64 64"
       >
-        <path
-          d="M32 12C20 12 16 18 16 28V38C16 48 32 54 32 54C32 54 48 48 48 38V28C48 18 44 12 32 12Z"
-        />
+        <path d="M32 12C20 12 16 18 16 28V38C16 48 32 54 32 54C32 54 48 48 48 38V28C48 18 44 12 32 12Z" />
         <path d="M25 36L30 31L34 35L39 28" />
         <path d="M35 28H39V32" />
       </svg>
@@ -246,1157 +123,430 @@ function BrandMark({ small = false }: { small?: boolean }) {
   );
 }
 
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  }).format(Math.abs(amount));
+}
+
 export default function Home() {
-  const shouldReduceMotion = useReducedMotion();
-  const [transactions, setTransactions] = useState(initialDemoTransactions);
-  const [recurringCharges, setRecurringCharges] = useState(
-    initialRecurringCharges,
-  );
-  const [hoveredCategory, setHoveredCategory] = useState<DemoCategory | null>(
-    null,
-  );
-  const [selectedCategory, setSelectedCategory] = useState<
-    "Todas" | DemoCategory
-  >("Todas");
-  const [budgetLimits, setBudgetLimits] = useState({
-    Ocio: 80000,
-    Restaurantes: 120000,
-    Supermercado: 220000,
-  });
-
-  const filteredTransactions = useMemo(
+  const reduceMotion = useReducedMotion();
+  const [selectedFilter, setSelectedFilter] = useState<CategoryFilter>("Todos");
+  const visibleMovements = useMemo(
     () =>
-      selectedCategory === "Todas"
-        ? transactions
-        : transactions.filter(
-            (transaction) => transaction.category === selectedCategory,
-          ),
-    [selectedCategory, transactions],
+      selectedFilter === "Todos"
+        ? movements
+        : movements.filter((movement) => movement.category === selectedFilter),
+    [selectedFilter],
   );
-  const expenseDistribution = useMemo(
-    () =>
-      demoCategories
-        .filter((category) => category !== "Pagos")
-        .map((category) => ({
-          category,
-          amount: filteredTransactions
-            .filter(
-              (transaction) =>
-                transaction.type === "EXPENSE" &&
-                transaction.category === category,
-            )
-            .reduce((total, transaction) => total + transaction.amount, 0),
-        }))
-        .filter((entry) => entry.amount > 0),
-    [filteredTransactions],
-  );
-  const totalExpenses = useMemo(
-    () =>
-      filteredTransactions
-        .filter((transaction) => transaction.type === "EXPENSE")
-        .reduce((total, transaction) => total + transaction.amount, 0),
-    [filteredTransactions],
-  );
-  const totalIncome = useMemo(
-    () =>
-      filteredTransactions
-        .filter((transaction) => transaction.type === "INCOME")
-        .reduce((total, transaction) => total + transaction.amount, 0),
-    [filteredTransactions],
-  );
-  const openingBalance = 650000;
-  const netBalance = openingBalance + totalIncome - totalExpenses;
-  const upcomingCharges = recurringCharges.filter(
-    (charge) => charge.status === "upcoming",
-  );
-  const budgetSpending = useMemo(
-    () =>
-      filteredTransactions
-        .filter(
-          (transaction) =>
-            transaction.type === "EXPENSE" &&
-            (transaction.category === "Ocio" ||
-              transaction.category === "Restaurantes" ||
-              transaction.category === "Supermercado"),
-        )
-        .reduce<Record<string, number>>((totals, transaction) => {
-          totals[transaction.category] =
-            (totals[transaction.category] ?? 0) + transaction.amount;
-          return totals;
-        }, {}),
-    [filteredTransactions],
-  );
-
-  function updateTransactionCategory(id: number, category: DemoCategory) {
-    setTransactions((currentTransactions) =>
-      currentTransactions.map((transaction) =>
-        transaction.id === id ? { ...transaction, category } : transaction,
-      ),
-    );
-  }
-
-  function removeTransaction(id: number) {
-    setTransactions((currentTransactions) =>
-      currentTransactions.filter((transaction) => transaction.id !== id),
-    );
-  }
-
-  function updateRecurringCharge(
-    charge: RecurringCharge,
-    status: Exclude<RecurringChargeStatus, "upcoming">,
-  ) {
-    setRecurringCharges((currentCharges) =>
-      currentCharges.map((currentCharge) =>
-        currentCharge.id === charge.id
-          ? { ...currentCharge, status }
-          : currentCharge,
-      ),
-    );
-
-    if (status === "paid") {
-      setTransactions((currentTransactions) => [
-        {
-          id:
-            Math.max(0, ...currentTransactions.map((transaction) => transaction.id)) +
-            1,
-          date: "Hoy",
-          description: `${charge.name} · cobro recurrente`,
-          amount: charge.amount,
-          type: "EXPENSE",
-          category: charge.category,
-        },
-        ...currentTransactions,
-      ]);
-    }
-  }
-
-  function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency: "CLP",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-white text-slate-900">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -top-56 left-1/2 h-[34rem] w-[52rem] -translate-x-1/2 rounded-full bg-emerald-500/[0.09] blur-3xl"
-      />
-
-      <header className="relative border-b border-slate-200">
+    <main className="min-h-screen overflow-hidden bg-white text-slate-800">
+      <header className="relative z-10 border-b border-slate-100 bg-white/90">
         <nav
           aria-label="Navegación principal"
-          className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8"
+          className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-4 sm:px-8"
         >
-          <Link
-            aria-label="VaultTracker, inicio"
-            className="flex items-center gap-3"
-            href="/"
-          >
-            <BrandMark small />
-            <span className="text-sm font-semibold tracking-[0.16em] text-slate-900">
+          <Link aria-label="VaultTracker, inicio" className="flex items-center gap-3" href="/">
+            <BrandMark />
+            <span className="text-sm font-bold tracking-[0.12em] text-slate-800">
               VAULTTRACKER
             </span>
           </Link>
-          <Link
-            className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-emerald-500/60 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
-            href="/login"
-          >
-            Iniciar sesión
-          </Link>
+          <div className="flex items-center gap-3">
+            <a
+              className="hidden px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-emerald-600 sm:inline-flex"
+              href="#como-funciona"
+            >
+              Cómo funciona
+            </a>
+            <Link
+              className="rounded-full bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
+              href="/login"
+            >
+              Iniciar sesión
+            </Link>
+          </div>
         </nav>
       </header>
 
-      <motion.section
-        animate={{ opacity: 1, y: 0 }}
-        className="relative mx-auto grid w-full max-w-7xl items-center gap-14 px-5 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-24 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pb-32 lg:pt-28"
-        initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
-        transition={{ duration: 0.65, ease: "easeOut" }}
+      <section
+        className="relative mx-auto grid w-full max-w-7xl items-center gap-14 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[1fr_0.95fr] lg:gap-16 lg:py-28"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle, rgba(148,163,184,0.2) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+          backgroundPosition: "right 16px top 0",
+        }}
       >
         <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-2xl"
-          initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
-          transition={{ delay: 0.12, duration: 0.55, ease: "easeOut" }}
+          transition={{ duration: 0.55, ease: "easeOut" }}
+          className="relative z-10 max-w-2xl bg-white/90 py-3 pr-2"
         >
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/70 px-3.5 py-2 text-xs font-medium text-emerald-800">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            Claridad para tus decisiones financieras
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-700">
+            <Sparkles aria-hidden="true" className="h-3.5 w-3.5" />
+            Tus finanzas, por fin en orden
           </div>
-          <h1 className="text-4xl font-semibold leading-[1.12] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-            Toma el control de tu{" "}
-            <span className="text-emerald-600">patrimonio financiero.</span>
+          <h1 className="text-5xl font-semibold leading-[1.05] tracking-tight text-slate-800 sm:text-6xl lg:text-7xl">
+            Todas tus finanzas{" "}
+            <span className="text-emerald-500">centralizadas.</span>
           </h1>
           <p className="mt-6 max-w-xl text-base leading-7 text-slate-500 sm:text-lg sm:leading-8">
-            Reúne tus movimientos en un solo lugar. Importa tu cartola y
-            convierte tus transacciones en una visión clara de tus ingresos y
-            gastos.
+            Conecta tus movimientos en un solo lugar. Importa tu cartola y
+            descubre con claridad cómo se mueve tu dinero.
           </p>
-          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <motion.div
-              whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-              whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+              whileHover={reduceMotion ? undefined : { scale: 1.03 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.98 }}
             >
               <Link
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/10 transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-500 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-600"
                 href="/login"
               >
-                Comenzar ahora
-                <svg
-                  aria-hidden="true"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M5 12h14m-6-6 6 6-6 6" />
-                </svg>
+                Comenzar gratis
+                <ArrowRight aria-hidden="true" className="h-4 w-4" />
               </Link>
             </motion.div>
-            <motion.a
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50/70 px-5 py-3.5 text-sm font-semibold text-emerald-800 transition hover:border-emerald-300/60 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
-              href="#demo-interactivo"
-              whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-              whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+            <a
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50/60"
+              href="#movimientos"
             >
-              Explorar resumen interactivo
-              <svg
-                aria-hidden="true"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-                viewBox="0 0 24 24"
-              >
-                <path d="M12 5v14m-7-7 7 7 7-7" />
-              </svg>
-            </motion.a>
-            <motion.a
-              className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-5 py-3.5 text-sm font-medium text-slate-700 transition hover:border-slate-500 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
-              href="#caracteristicas"
-              whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-              whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
-            >
-              Conoce la plataforma
-            </motion.a>
+              Ver cómo funciona
+            </a>
           </div>
-          <div className="mt-8 flex items-center gap-3 text-xs text-slate-500">
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4 text-emerald-600"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 3.5 19 6v5.75c0 4.25-2.85 7.3-7 8.75-4.15-1.45-7-4.5-7-8.75V6l7-2.5Z" />
-              <path d="m9 12 2 2 4-4" />
-            </svg>
-            Tus finanzas personales, siempre bajo tu control
+          <div className="mt-7 flex items-center gap-2 text-xs text-slate-500">
+            <ShieldCheck aria-hidden="true" className="h-4 w-4 text-emerald-500" />
+            Seguro, privado y siempre bajo tu control
           </div>
         </motion.div>
 
         <motion.div
-          animate={{ opacity: 1, y: 0 }}
-          className="relative mx-auto w-full max-w-xl lg:ml-auto"
-          initial={shouldReduceMotion ? false : { opacity: 0, y: 24 }}
-          transition={{ delay: 0.28, duration: 0.6, ease: "easeOut" }}
+          initial={reduceMotion ? false : { opacity: 0, y: 20, rotate: 2 }}
+          animate={{ opacity: 1, y: 0, rotate: 0 }}
+          transition={{ delay: 0.15, duration: 0.65, ease: "easeOut" }}
+          className="relative mx-auto h-[360px] w-full max-w-[500px] sm:h-[420px]"
         >
-          <div
+          <motion.div
             aria-hidden="true"
-            className="absolute -inset-5 rounded-[2rem] bg-emerald-50/60 blur-2xl"
-          />
-          <div className="relative rounded-2xl border border-slate-100/80 bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-7">
-            <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-5">
-              <div className="flex items-center gap-3">
-                <BrandMark small />
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    Resumen financiero
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Vista de tus movimientos
-                  </p>
-                </div>
+            className="absolute left-[8%] top-[12%] h-56 w-[82%] rotate-[-10deg] rounded-3xl bg-gradient-to-br from-rose-500 to-red-700 p-6 text-white shadow-2xl shadow-red-900/20 sm:h-64"
+            animate={reduceMotion ? undefined : { y: [0, -8, 0] }}
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-medium text-white/75">Santander</p>
+                <p className="mt-1 text-[10px] tracking-wide text-white/55">Cuenta vista</p>
               </div>
-              <span className="rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[10px] font-medium text-emerald-800">
-                EJEMPLO
+              <span className="text-xl font-bold italic tracking-tight">Santander</span>
+            </div>
+            <div className="mt-10 flex items-center gap-3">
+              <span className="h-8 w-10 rounded-md border border-white/30 bg-white/15" />
+              <span className="text-sm tracking-[0.25em] text-white/80">
+                •••• &nbsp; •••• &nbsp; •••• &nbsp; 4821
               </span>
             </div>
-
-            <div className="mt-6">
-              <p className="text-xs text-slate-500">Balance neto</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-                $ 482.350
-              </p>
-              <p className="mt-2 text-xs text-slate-500">
-                Calculado desde ingresos y gastos importados
-              </p>
+            <div className="mt-5 flex items-center justify-between text-[10px] uppercase tracking-widest text-white/65">
+              <span>Cuenta principal</span>
+              <span>VISA</span>
             </div>
-
-            <div className="mt-7 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/40">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                  Ingresos
-                </div>
-                <p className="mt-3 text-lg font-semibold text-slate-900">$ 850.000</p>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/40">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <span className="h-2 w-2 rounded-full bg-rose-400" />
-                  Gastos
-                </div>
-                <p className="mt-3 text-lg font-semibold text-slate-900">$ 367.650</p>
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/40">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-700">
-                  Actividad reciente
-                </p>
-                <span className="text-[10px] text-slate-500">ÚLTIMOS MOVIMIENTOS</span>
-              </div>
-              <div className="mt-4 space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-700">
-                      <svg
-                        aria-hidden="true"
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="1.8"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M12 5v14m-6-6 6 6 6-6" />
-                      </svg>
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-slate-700">
-                        Compra con tarjeta
-                      </p>
-                      <p className="mt-1 text-[10px] text-slate-500">
-                        Movimiento importado
-                      </p>
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-xs font-medium text-slate-700">
-                    −$ 24.990
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                      <svg
-                        aria-hidden="true"
-                        className="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="1.8"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M12 19V5m6 6-6-6-6 6" />
-                      </svg>
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-slate-700">
-                        Depósito recibido
-                      </p>
-                      <p className="mt-1 text-[10px] text-slate-500">
-                        Movimiento importado
-                      </p>
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-xs font-medium text-emerald-700">
-                    +$ 120.000
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </motion.section>
-
-      <motion.section
-        aria-labelledby="interactive-demo-title"
-        className="relative border-y border-slate-200 bg-emerald-50/40"
-        id="demo-interactivo"
-        initial={shouldReduceMotion ? false : { opacity: 0, y: 28 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.12 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-      >
-        <div className="mx-auto w-full max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:py-24">
-          <motion.div
-            className="mx-auto mb-10 max-w-3xl text-center"
-            initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <p className="text-sm font-medium text-emerald-600">
-              Explora con datos de ejemplo
-            </p>
-            <h2
-              className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl"
-              id="interactive-demo-title"
-            >
-              Prueba el potencial de VaultTracker
-            </h2>
-            <p className="mt-4 text-sm leading-6 text-slate-500 sm:text-base">
-              Filtra movimientos, cambia categorías y ajusta tus límites. Todo
-              lo que ves es interactivo y ocurre en esta página.
-            </p>
           </motion.div>
 
           <motion.div
-            className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-xl shadow-slate-200/50 ring-1 ring-emerald-100/60"
-            initial={shouldReduceMotion ? false : { opacity: 0, y: 22 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, amount: 0.1 }}
-            transition={{ delay: 0.1, duration: 0.55 }}
+            aria-hidden="true"
+            className="absolute bottom-[7%] right-[4%] h-56 w-[78%] rotate-[8deg] rounded-3xl border border-white/80 bg-gradient-to-br from-emerald-400 to-emerald-600 p-6 text-white shadow-2xl shadow-emerald-900/20 sm:h-64"
+            animate={reduceMotion ? undefined : { y: [0, 9, 0] }}
+            transition={{
+              delay: 0.4,
+              duration: 7,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
           >
-            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
-              <div aria-hidden="true" className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-rose-400/90" />
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-300/90" />
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/90" />
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-medium tracking-wide text-slate-500 sm:text-xs">
-                <Wallet aria-hidden="true" className="h-3.5 w-3.5 text-emerald-600" />
-                VaultTracker · Vista previa interactiva
-              </div>
-              <span aria-hidden="true" className="w-10" />
-            </div>
-            <div className="p-4 sm:p-7 lg:p-8">
-            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  Resumen de noviembre
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Datos ficticios · prueba los controles para explorar
-                </p>
+                <p className="text-xs font-medium text-white/75">VaultTracker</p>
+                <p className="mt-1 text-[10px] text-white/60">Tu resumen financiero</p>
               </div>
-              <label className="flex items-center gap-2 text-xs text-slate-500">
-                Categoría
-                <select
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                  onChange={(event) =>
-                    setSelectedCategory(
-                      event.target.value === "Todas"
-                        ? "Todas"
-                        : (event.target.value as DemoCategory),
-                    )
-                  }
-                  value={selectedCategory}
-                >
-                  <option value="Todas">Todas</option>
-                  {demoCategories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <CreditCard aria-hidden="true" className="h-6 w-6 text-white/80" />
             </div>
-
-            <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <motion.article
-                className="rounded-xl border border-slate-100/80 bg-white p-4 shadow-sm shadow-slate-200/50"
-                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-slate-500">Saldo Inicial</p>
-                  <Wallet aria-hidden="true" className="h-4 w-4 text-slate-500" />
-                </div>
-                <motion.p
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-2 text-xl font-semibold text-slate-900"
-                  initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
-                  key={openingBalance}
-                  transition={{ duration: 0.2 }}
-                >
-                  {formatCurrency(openingBalance)}
-                </motion.p>
-              </motion.article>
-              <motion.article
-                className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm shadow-slate-200/50"
-                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-emerald-800">Ingresos (+)</p>
-                  <ArrowUpRight aria-hidden="true" className="h-4 w-4 text-emerald-600" />
-                </div>
-                <motion.p
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-2 text-xl font-semibold text-slate-900"
-                  initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
-                  key={totalIncome}
-                  transition={{ duration: 0.2 }}
-                >
-                  {formatCurrency(totalIncome)}
-                </motion.p>
-              </motion.article>
-              <motion.article
-                className="rounded-xl border border-rose-100 bg-white p-4 shadow-sm shadow-slate-200/50"
-                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-rose-700">Gastos (-)</p>
-                  <ArrowDownRight aria-hidden="true" className="h-4 w-4 text-rose-400" />
-                </div>
-                <motion.p
-                  animate={{ opacity: 1, y: 0 }}
-                  className="mt-2 text-xl font-semibold text-slate-900"
-                  initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
-                  key={totalExpenses}
-                  transition={{ duration: 0.2 }}
-                >
-                  {formatCurrency(totalExpenses)}
-                </motion.p>
-              </motion.article>
-              <motion.article
-                className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 shadow-sm shadow-slate-200/50"
-                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium text-slate-700">Balance Resultante</p>
-                  <Wallet aria-hidden="true" className="h-4 w-4 text-emerald-600" />
-                </div>
-                <motion.p
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`mt-2 text-xl font-semibold ${
-                    netBalance < 0 ? "text-rose-700" : "text-slate-900"
-                  }`}
-                  initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
-                  key={netBalance}
-                  transition={{ duration: 0.2 }}
-                >
-                  {formatCurrency(netBalance)}
-                </motion.p>
-              </motion.article>
+            <div className="mt-10 text-[10px] uppercase tracking-widest text-white/65">
+              Balance disponible
             </div>
-
-            <motion.article
-              className="mb-5 rounded-xl border border-emerald-500/15 bg-white p-4 sm:p-5"
-              initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.2 }}
-              transition={{ duration: 0.35 }}
-            >
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
-                    <CalendarClock aria-hidden="true" className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Próximos cobros y suscripciones
-                    </h3>
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Marca un cobro como pagado para incluirlo en tu flujo
-                    </p>
-                  </div>
-                </div>
-                <span className="rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[10px] font-medium text-emerald-800">
-                  {upcomingCharges.length} pendientes
-                </span>
-              </div>
-              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {upcomingCharges.map((charge) => (
-                  <motion.div
-                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white p-3 shadow-sm shadow-slate-200/40"
-                    key={charge.id}
-                    layout={!shouldReduceMotion}
-                    whileHover={shouldReduceMotion ? undefined : { scale: 1.015 }}
-                    whileTap={shouldReduceMotion ? undefined : { scale: 0.99 }}
-                  >
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-lg">
-                        {categoryEmojis[charge.category]}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold text-slate-700">
-                          {charge.name}
-                        </p>
-                        <p className="mt-1 text-[10px] text-slate-500">
-                          {formatCurrency(charge.amount)} · vence en{" "}
-                          {charge.daysUntilDue} días
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <motion.button
-                        aria-label={`Marcar ${charge.name} como pagado`}
-                        className="rounded-md p-1.5 text-slate-500 transition hover:bg-emerald-100 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-emerald-400"
-                        onClick={() => updateRecurringCharge(charge, "paid")}
-                        title="Marcar pagado"
-                        type="button"
-                        whileHover={shouldReduceMotion ? undefined : { scale: 1.12 }}
-                        whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
-                      >
-                        <CircleCheck aria-hidden="true" className="h-4 w-4" />
-                      </motion.button>
-                      <motion.button
-                        aria-label={`Ignorar cobro de ${charge.name}`}
-                        className="rounded-md p-1.5 text-slate-500 transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-2 focus-visible:outline-rose-400"
-                        onClick={() => updateRecurringCharge(charge, "ignored")}
-                        title="Ignorar cobro"
-                        type="button"
-                        whileHover={shouldReduceMotion ? undefined : { scale: 1.12 }}
-                        whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
-                      >
-                        <CircleX aria-hidden="true" className="h-4 w-4" />
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                ))}
-                {upcomingCharges.length === 0 && (
-                  <p className="rounded-lg border border-dashed border-slate-200 px-3 py-5 text-center text-xs text-slate-500 md:col-span-2 xl:col-span-3">
-                    Ya revisaste todos los cobros de ejemplo.
-                  </p>
-                )}
-              </div>
-            </motion.article>
-
-            <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-              <motion.article
-                className="rounded-xl border border-slate-100/80 bg-white p-4 shadow-sm shadow-slate-200/50 sm:p-5"
-                whileHover={shouldReduceMotion ? undefined : { scale: 1.01 }}
-              >
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Distribución de gastos
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Selecciona un segmento para filtrar los movimientos
-                  </p>
-                </div>
-                <div className="mt-2 grid items-center gap-3 sm:grid-cols-[minmax(0,1.1fr)_minmax(8rem,0.9fr)]">
-                  <div className="h-56 min-w-0">
-                    <ResponsiveContainer height="100%" width="100%">
-                      <PieChart>
-                        <Pie
-                          data={expenseDistribution}
-                          dataKey="amount"
-                          innerRadius="57%"
-                          isAnimationActive={!shouldReduceMotion}
-                          nameKey="category"
-                          outerRadius={hoveredCategory ? "88%" : "84%"}
-                          paddingAngle={3}
-                          stroke="none"
-                        >
-                          {expenseDistribution.map((entry) => (
-                            <Cell
-                              fill={demoColors[entry.category]}
-                              fillOpacity={
-                                hoveredCategory
-                                  ? hoveredCategory === entry.category
-                                    ? 1
-                                    : 0.45
-                                  : selectedCategory === "Todas" ||
-                                      selectedCategory === entry.category
-                                  ? 1
-                                  : 0.35
-                              }
-                              key={entry.category}
-                              onClick={() =>
-                                setSelectedCategory((currentCategory) =>
-                                  currentCategory === entry.category
-                                    ? "Todas"
-                                    : entry.category,
-                                )
-                              }
-                              onMouseEnter={() =>
-                                setHoveredCategory(entry.category)
-                              }
-                              onMouseLeave={() => setHoveredCategory(null)}
-                              stroke={
-                                hoveredCategory === entry.category
-                                  ? "#334155"
-                                  : "none"
-                              }
-                              strokeWidth={hoveredCategory === entry.category ? 2 : 0}
-                              style={{
-                                cursor: "pointer",
-                                transition: shouldReduceMotion
-                                  ? undefined
-                                  : "fill-opacity 180ms ease, stroke-width 180ms ease",
-                              }}
-                            />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "#ffffff",
-                            border: "1px solid #e2e8f0",
-                            borderRadius: "0.75rem",
-                            color: "#334155",
-                          }}
-                          formatter={(value, name) => [
-                            formatCurrency(Number(value)),
-                            String(name),
-                          ]}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <ul className="space-y-2.5">
-                    {expenseDistribution.map((entry) => {
-                      const allExpenses = expenseDistribution.reduce(
-                        (total, category) => total + category.amount,
-                        0,
-                      );
-                      return (
-                        <li key={entry.category}>
-                          <motion.button
-                            aria-pressed={selectedCategory === entry.category}
-                            className="flex w-full items-center justify-between gap-2 text-left text-xs"
-                            onClick={() =>
-                              setSelectedCategory((currentCategory) =>
-                                currentCategory === entry.category
-                                  ? "Todas"
-                                  : entry.category,
-                              )
-                            }
-                            type="button"
-                            onMouseEnter={() =>
-                              setHoveredCategory(entry.category)
-                            }
-                            onMouseLeave={() => setHoveredCategory(null)}
-                            whileHover={shouldReduceMotion ? undefined : { x: 2 }}
-                            whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
-                          >
-                            <span className="flex min-w-0 items-center gap-2 text-slate-700">
-                              <span
-                                aria-hidden="true"
-                                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                style={{
-                                  backgroundColor: demoColors[entry.category],
-                                }}
-                              />
-                              <span aria-hidden="true">
-                                {categoryEmojis[entry.category]}
-                              </span>
-                              <span className="truncate">{entry.category}</span>
-                            </span>
-                            <span className="shrink-0 text-slate-500">
-                              {((entry.amount / allExpenses) * 100).toFixed(0)}%
-                            </span>
-                          </motion.button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              </motion.article>
-
-              <motion.article
-                className="rounded-xl border border-slate-100/80 bg-white p-4 shadow-sm shadow-slate-200/50 sm:p-5"
-                whileHover={shouldReduceMotion ? undefined : { scale: 1.005 }}
-              >
-                <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      Movimientos recientes
-                    </h3>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Cambia la categoría de una fila para actualizar el gráfico
-                    </p>
-                  </div>
-                  <span className="text-xs text-slate-500">
-                    {filteredTransactions.length} movimientos
-                  </span>
-                </div>
-
-                <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
-                    <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
-                      <tr>
-                        <th className="px-3 py-3 font-medium" scope="col">
-                          Fecha
-                        </th>
-                        <th className="px-3 py-3 font-medium" scope="col">
-                          Descripción
-                        </th>
-                        <th className="px-3 py-3 font-medium" scope="col">
-                          Categoría
-                        </th>
-                        <th
-                          className="whitespace-nowrap px-3 py-3 text-right font-medium"
-                          scope="col"
-                        >
-                          Monto
-                        </th>
-                        <th className="px-3 py-3" scope="col">
-                          <span className="sr-only">Acciones</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {filteredTransactions.map((transaction) => (
-                        <motion.tr
-                          className="text-slate-700"
-                          key={transaction.id}
-                          whileHover={shouldReduceMotion ? undefined : { scale: 1.005, backgroundColor: "rgba(236, 253, 245, 0.9)" }}
-                          whileTap={shouldReduceMotion ? undefined : { scale: 0.995 }}
-                          transition={{ duration: 0.15 }}
-                        >
-                          <td className="whitespace-nowrap px-3 py-3 text-slate-500">
-                            {transaction.date}
-                          </td>
-                          <td className="min-w-36 px-3 py-3">
-                            <span className="block truncate">
-                              {transaction.description}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <motion.button
-                                aria-label={`Filtrar por ${transaction.category}`}
-                                aria-pressed={
-                                  selectedCategory === transaction.category
-                                }
-                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] transition ${
-                                  selectedCategory === transaction.category
-                                    ? "border-emerald-200 bg-emerald-100 text-emerald-800"
-                                    : "border-slate-200 bg-slate-100 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
-                                }`}
-                                onClick={() =>
-                                  setSelectedCategory((currentCategory) =>
-                                    currentCategory === transaction.category
-                                      ? "Todas"
-                                      : transaction.category,
-                                  )
-                                }
-                                type="button"
-                                whileHover={
-                                  shouldReduceMotion ? undefined : { scale: 1.06 }
-                                }
-                                whileTap={
-                                  shouldReduceMotion ? undefined : { scale: 0.94 }
-                                }
-                              >
-                                <span aria-hidden="true">
-                                  {categoryEmojis[transaction.category]}
-                                </span>
-                                {transaction.category}
-                              </motion.button>
-                              <select
-                                aria-label={`Editar categoría de ${transaction.description}`}
-                                className="max-w-36 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-700 outline-none focus:border-emerald-500"
-                                onChange={(event) => {
-                                  const category =
-                                    demoCategories.find(
-                                      (option) => option === event.target.value,
-                                    ) ?? "Ocio";
-                                  updateTransactionCategory(
-                                    transaction.id,
-                                    category,
-                                  );
-                                }}
-                                value={transaction.category}
-                              >
-                                {demoCategories.map((category) => (
-                                  <option key={category} value={category}>
-                                    {categoryEmojis[category]} {category}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </td>
-                          <td
-                            className={`whitespace-nowrap px-3 py-3 text-right font-medium ${
-                              transaction.type === "INCOME"
-                                ? "text-emerald-800"
-                                : "text-slate-700"
-                            }`}
-                          >
-                            {transaction.type === "INCOME" ? "+" : "−"}
-                            {formatCurrency(transaction.amount)}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right">
-                            <motion.button
-                              aria-label={`Eliminar ${transaction.description} de la demo`}
-                              className="rounded-md p-1.5 text-slate-500 transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
-                              onClick={() => removeTransaction(transaction.id)}
-                              title={`Eliminar ${transaction.description}`}
-                              type="button"
-                              whileHover={shouldReduceMotion ? undefined : { scale: 1.1 }}
-                              whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
-                            >
-                              <svg
-                                aria-hidden="true"
-                                className="h-4 w-4"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="1.7"
-                                viewBox="0 0 24 24"
-                              >
-                                <path d="M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3" />
-                              </svg>
-                            </motion.button>
-                          </td>
-                        </motion.tr>
-                      ))}
-                      {filteredTransactions.length === 0 && (
-                        <tr>
-                          <td
-                            className="px-3 py-8 text-center text-slate-500"
-                            colSpan={5}
-                          >
-                            No hay movimientos en esta categoría.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </motion.article>
-            </div>
-
-            <article className="mt-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-              <div className="mb-4">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Metas de presupuesto
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Ajusta los límites y observa cómo cambia tu progreso
-                </p>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                {(["Ocio", "Restaurantes", "Supermercado"] as const).map(
-                  (category) => {
-                    const spent = budgetSpending[category] ?? 0;
-                    const limit = budgetLimits[category];
-                    const progress = limit > 0 ? (spent / limit) * 100 : 0;
-                    const progressColor =
-                      progress < 75
-                        ? "bg-emerald-400"
-                        : progress <= 95
-                          ? "bg-amber-400"
-                          : "bg-rose-400";
-                    const progressTextColor =
-                      progress < 75
-                        ? "text-emerald-800"
-                        : progress <= 95
-                          ? "text-amber-700"
-                          : "text-rose-700";
-
-                    return (
-                      <motion.div
-                        className="rounded-lg border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/40"
-                        key={category}
-                        whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                        transition={{ duration: 0.18 }}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-slate-700">
-                            {category}
-                          </span>
-                          <motion.span
-                            animate={{ opacity: 1 }}
-                            className={`text-xs font-semibold ${progressTextColor}`}
-                            initial={shouldReduceMotion ? false : { opacity: 0.55 }}
-                            key={`${category}-${progress.toFixed(0)}`}
-                            transition={{ duration: 0.2 }}
-                          >
-                            {progress.toFixed(0)}%
-                          </motion.span>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
-                          <span>Gastado {formatCurrency(spent)}</span>
-                          <span>Límite {formatCurrency(limit)}</span>
-                        </div>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                          <motion.div
-                            animate={{ width: `${Math.min(progress, 100)}%` }}
-                            className={`h-full rounded-full transition-all ${progressColor}`}
-                            initial={false}
-                            transition={{ duration: 0.35, ease: "easeOut" }}
-                          />
-                        </div>
-                        <label className="mt-3 block">
-                          <span className="sr-only">
-                            Ajustar límite de {category}
-                          </span>
-                          <input
-                            aria-label={`Límite mensual de ${category}`}
-                            className="h-1.5 w-full cursor-pointer accent-emerald-400"
-                            max="400000"
-                            min="20000"
-                            onChange={(event) =>
-                              setBudgetLimits((currentLimits) => ({
-                                ...currentLimits,
-                                [category]: Number(event.target.value),
-                              }))
-                            }
-                            step="5000"
-                            type="range"
-                            value={limit}
-                          />
-                        </label>
-                      </motion.div>
-                    );
-                  },
-                )}
-              </div>
-            </article>
-
-            <motion.div
-              className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-5 text-center sm:flex-row sm:text-left"
-              whileHover={shouldReduceMotion ? undefined : { scale: 1.005 }}
-            >
-              <p className="text-sm text-slate-500">
-                ¿Quieres usarlo con tus cartolas reales?
-              </p>
-              <Link
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
-                href="/login"
-              >
-                Crear cuenta / Iniciar sesión
-                <svg
-                  aria-hidden="true"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.8"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M5 12h14m-6-6 6 6-6 6" />
-                </svg>
-              </Link>
-            </motion.div>
+            <p className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+              $2.410.700
+            </p>
+            <div className="mt-4 flex items-center justify-between text-[10px] text-white/75">
+              <span>Movimientos sincronizados</span>
+              <span>•• 08</span>
             </div>
           </motion.div>
-        </div>
-      </motion.section>
 
-      <motion.section
-        aria-labelledby="features-title"
-        className="relative border-y border-slate-200 bg-slate-50"
-        id="caracteristicas"
-        initial={shouldReduceMotion ? false : { opacity: 0, y: 28 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.12 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-      >
-        <div className="mx-auto w-full max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:py-24">
           <motion.div
-            className="mx-auto mb-11 max-w-2xl text-center sm:mb-14"
-            initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
+            aria-hidden="true"
+            className="absolute right-0 top-[4%] rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-xl shadow-slate-300/40"
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.5, duration: 0.4 }}
           >
-            <p className="text-sm font-medium text-emerald-600">
-              Finanzas más simples
-            </p>
-            <h2
-              className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl"
-              id="features-title"
-            >
-              Todo lo importante, en un solo lugar.
-            </h2>
-            <p className="mt-4 text-sm leading-6 text-slate-500 sm:text-base">
-              Menos tiempo ordenando datos. Más claridad para entender cómo se
-              mueve tu dinero.
-            </p>
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <Check className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold text-slate-800">Todo al día</p>
+                <p className="mt-0.5 text-[10px] text-slate-500">Resumen actualizado</p>
+              </div>
+            </div>
           </motion.div>
+        </motion.div>
+      </section>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {features.map((feature, index) => (
-              <motion.article
-                initial={shouldReduceMotion ? false : { opacity: 0, y: 22 }}
-                className="rounded-2xl border border-slate-200 bg-white p-6 transition hover:border-emerald-500/30 sm:p-7"
-                key={feature.number}
+      <section aria-labelledby="banks-heading" className="border-y border-slate-100 bg-slate-50/70">
+        <div className="mx-auto max-w-7xl px-5 py-9 sm:px-8">
+          <p
+            className="text-center text-xs font-semibold uppercase tracking-[0.16em] text-slate-400"
+            id="banks-heading"
+          >
+            Bancos soportados para importación
+          </p>
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            {banks.map((bank, index) => (
+              <motion.div
+                key={bank.name}
+                className="relative flex items-center justify-center gap-2.5"
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
-                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
-                viewport={{ once: true, amount: 0.2 }}
-                transition={{ delay: index * 0.12, duration: 0.45 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.06, duration: 0.3 }}
               >
-                <div className="flex items-center justify-between">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-600">
-                    <svg
-                      aria-hidden="true"
-                      className="h-5 w-5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="1.6"
-                      viewBox="0 0 24 24"
-                    >
-                      {feature.icon}
-                    </svg>
-                  </span>
-                  <span className="text-xs font-medium tracking-widest text-slate-500">
-                    {feature.number}
-                  </span>
+                <span
+                  className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${
+                    bank.style
+                  } ${index > 0 ? "grayscale" : ""}`}
+                >
+                  {bank.initial}
+                </span>
+                <div>
+                  <p
+                    className={`text-xs font-semibold ${
+                      index === 0 ? "text-slate-700" : "text-slate-400"
+                    }`}
+                  >
+                    {bank.name}
+                  </p>
+                  {index > 0 && (
+                    <p className="mt-0.5 text-[9px] font-medium uppercase tracking-wide text-slate-400">
+                      Próximamente
+                    </p>
+                  )}
+                  {index === 0 && (
+                    <p className="mt-0.5 text-[9px] font-medium uppercase tracking-wide text-emerald-600">
+                      Disponible
+                    </p>
+                  )}
                 </div>
-                <h3 className="mt-6 text-lg font-semibold text-slate-900">
-                  {feature.title}
-                </h3>
-                <p className="mt-3 text-sm leading-6 text-slate-500">
-                  {feature.description}
-                </p>
-              </motion.article>
+              </motion.div>
             ))}
           </div>
         </div>
-      </motion.section>
+      </section>
 
-      <footer className="relative">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-5 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+      <section
+        aria-labelledby="movements-heading"
+        className="mx-auto grid w-full max-w-7xl items-center gap-12 px-5 py-20 sm:px-8 sm:py-28 lg:grid-cols-[0.85fr_1.15fr] lg:gap-20"
+        id="movimientos"
+      >
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.25 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+            <FileUp aria-hidden="true" className="h-3.5 w-3.5" />
+            Simple desde el primer día
+          </div>
+          <h2
+            className="text-3xl font-semibold leading-tight tracking-tight text-slate-800 sm:text-4xl"
+            id="movements-heading"
+          >
+            Entiende tus gastos sin perderte en los detalles.
+          </h2>
+          <p className="mt-4 text-sm leading-7 text-slate-500 sm:text-base">
+            Tus compras e ingresos, organizados automáticamente en una vista
+            clara. Sin hojas de cálculo ni trabajo manual.
+          </p>
+          <ul className="mt-7 space-y-3">
+            {[
+              "Importa tu cartola Santander en segundos",
+              "Encuentra tus movimientos por categoría",
+              "Mantén el control de tu balance",
+            ].map((item) => (
+              <li className="flex items-center gap-3 text-sm text-slate-600" key={item}>
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <Check aria-hidden="true" className="h-3 w-3" />
+                </span>
+                {item}
+              </li>
+            ))}
+          </ul>
+          <Link
+            className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-emerald-600 transition hover:text-emerald-700"
+            href="/login"
+          >
+            Explorar mi dashboard
+            <ArrowRight aria-hidden="true" className="h-4 w-4" />
+          </Link>
+        </motion.div>
+
+        <motion.div
+          className="rounded-3xl border border-slate-100 bg-white p-5 shadow-2xl shadow-slate-200/50 sm:p-7"
+          initial={reduceMotion ? false : { opacity: 0, y: 22 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.15 }}
+          transition={{ duration: 0.55 }}
+        >
+          <div className="flex flex-col justify-between gap-5 border-b border-slate-100 pb-5 sm:flex-row sm:items-end">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Saldo bancario</p>
+              <motion.p
+                className="mt-2 text-4xl font-semibold tracking-tight text-slate-800 sm:text-5xl"
+                initial={reduceMotion ? false : { opacity: 0.4, y: 6 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.45 }}
+              >
+                $2.410.700
+              </motion.p>
+            </div>
+            <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Actualizado
+            </span>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2" aria-label="Filtrar movimientos por categoría">
+            {filters.map((filter) => (
+              <motion.button
+                aria-pressed={selectedFilter === filter}
+                className={`rounded-full px-3.5 py-2 text-xs font-medium transition ${
+                  selectedFilter === filter
+                    ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20"
+                    : "bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                }`}
+                key={filter}
+                onClick={() => setSelectedFilter(filter)}
+                type="button"
+                whileHover={reduceMotion ? undefined : { scale: 1.04 }}
+                whileTap={reduceMotion ? undefined : { scale: 0.96 }}
+              >
+                {filter}
+              </motion.button>
+            ))}
+          </div>
+
+          <div className="mt-3 divide-y divide-slate-100">
+            {visibleMovements.map((movement, index) => (
+              <motion.div
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center justify-between gap-3 py-4"
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                key={movement.id}
+                transition={{ delay: index * 0.035, duration: 0.25 }}
+                whileHover={reduceMotion ? undefined : { x: 3 }}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${movement.logoClass}`}
+                  >
+                    {movement.initial}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-800">
+                      {movement.merchant}
+                    </p>
+                    <p className="mt-1 truncate text-xs text-slate-500">
+                      {movement.detail}
+                    </p>
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p
+                    className={`text-sm font-semibold ${
+                      movement.kind === "income"
+                        ? "text-emerald-600"
+                        : "text-slate-800"
+                    }`}
+                  >
+                    {movement.kind === "income" ? "+" : "−"}
+                    {formatCurrency(movement.amount)}
+                  </p>
+                  <p className="mt-1 text-[10px] text-slate-400">{movement.date}</p>
+                </div>
+              </motion.div>
+            ))}
+            {visibleMovements.length === 0 && (
+              <p className="py-8 text-center text-sm text-slate-500">
+                No hay movimientos en esta categoría.
+              </p>
+            )}
+          </div>
+
+          <div className="mt-2 border-t border-slate-100 pt-4 text-center">
+            <span className="text-xs text-slate-400">
+              Vista de ejemplo · tus movimientos solo tú puedes verlos
+            </span>
+          </div>
+        </motion.div>
+      </section>
+
+      <section className="bg-emerald-50/60">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-5 py-12 text-center sm:px-8 md:flex-row md:text-left">
+          <div>
+            <p className="text-xl font-semibold tracking-tight text-slate-800 sm:text-2xl">
+              Dale claridad a tus finanzas.
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
+              Empieza gratis y organiza tus movimientos hoy.
+            </p>
+          </div>
+          <Link
+            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/15 transition hover:bg-emerald-600"
+            href="/login"
+          >
+            Crear cuenta gratis
+            <ArrowRight aria-hidden="true" className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
+
+      <footer className="border-t border-slate-100 bg-white">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-5 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-8">
           <Link
             aria-label="VaultTracker, inicio"
             className="flex items-center gap-3"
             href="/"
           >
-            <BrandMark small />
-            <span className="text-xs font-semibold tracking-[0.16em] text-slate-700">
+            <BrandMark />
+            <span className="text-xs font-bold tracking-[0.14em] text-slate-700">
               VAULTTRACKER
             </span>
           </Link>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-400">
             © 2026 VaultTracker. Todos los derechos reservados.
           </p>
-          <div className="flex items-center gap-5 text-xs text-slate-500">
-            <a
-              className="transition hover:text-emerald-800"
-              href="#caracteristicas"
-            >
-              Características
-            </a>
-            <Link className="transition hover:text-emerald-800" href="/login">
-              Acceder
-            </Link>
-          </div>
+          <Link
+            className="text-xs font-medium text-slate-500 transition hover:text-emerald-600"
+            href="/login"
+          >
+            Acceder
+          </Link>
         </div>
       </footer>
     </main>

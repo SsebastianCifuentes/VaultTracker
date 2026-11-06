@@ -37,6 +37,58 @@ interface BudgetRecord {
   monthly_limit: number;
 }
 
+function getMerchantDomain(description: string) {
+  const merchant = description.toLocaleUpperCase("es");
+  const knownMerchants: Array<[string, string]> = [
+    ["UBER", "uber.com"],
+    ["STARBUCKS", "starbucks.com"],
+    ["LIDER", "lider.cl"],
+    ["MCDONALD", "mcdonalds.com"],
+    ["MCDONALDS", "mcdonalds.com"],
+    ["NETFLIX", "netflix.com"],
+    ["SPOTIFY", "spotify.com"],
+    ["JUMBO", "jumbo.cl"],
+    ["SANTA ISABEL", "santaisabel.cl"],
+    ["COPEC", "copec.cl"],
+    ["FALABELLA", "falabella.com"],
+    ["AIR CANADA", "aircanada.com"],
+    ["LATAM", "latamairlines.com"],
+    ["CINEMARK", "cinemark.cl"],
+    ["KFC", "kfc.com"],
+    ["SODIMAC", "sodimac.cl"],
+  ];
+
+  return knownMerchants.find(([name]) => merchant.includes(name))?.[1] ?? null;
+}
+
+function MerchantLogo({ description }: { description: string }) {
+  const [hasError, setHasError] = useState(false);
+  const domain = getMerchantDomain(description);
+  const merchantName =
+    description
+      .split(/[·#-]/)[0]
+      ?.trim()
+      .replace(/\s+/g, " ") || description.trim();
+  const initial = merchantName.charAt(0).toLocaleUpperCase("es") || "?";
+
+  return (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-100 bg-emerald-50 text-sm font-semibold text-emerald-700">
+      {domain && !hasError ? (
+        // Clearbit domains are resolved dynamically, so use a plain image with a local fallback.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          alt=""
+          className="h-full w-full rounded-full object-cover"
+          onError={() => setHasError(true)}
+          src={`https://logo.clearbit.com/${domain}`}
+        />
+      ) : (
+        initial
+      )}
+    </span>
+  );
+}
+
 const BUDGET_CATEGORIES = [
   "Ocio",
   "Restaurantes",
@@ -175,23 +227,23 @@ function HistorySkeletons() {
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         {Array.from({ length: 3 }, (_, index) => (
           <div
-            className="h-24 rounded-xl border border-slate-800 bg-slate-950/60"
+            className="h-24 rounded-xl border border-slate-200 bg-white"
             key={index}
           />
         ))}
       </div>
       <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="h-80 rounded-xl border border-slate-800 bg-slate-950/60" />
-        <div className="h-80 rounded-xl border border-slate-800 bg-slate-950/60" />
+        <div className="h-80 rounded-xl border border-slate-200 bg-white" />
+        <div className="h-80 rounded-xl border border-slate-200 bg-white" />
       </div>
-      <div className="overflow-hidden rounded-xl border border-slate-800">
-        <div className="h-11 bg-slate-950" />
+      <div className="overflow-hidden rounded-xl border border-slate-200">
+        <div className="h-11 bg-slate-50" />
         {Array.from({ length: 5 }, (_, index) => (
           <div
-            className="h-14 border-t border-slate-800 bg-slate-900"
+            className="h-14 border-t border-slate-200 bg-white"
             key={index}
           >
-            <div className="mx-4 mt-5 h-3 w-2/3 rounded bg-slate-800" />
+            <div className="mx-4 mt-5 h-3 w-2/3 rounded bg-slate-100" />
           </div>
         ))}
       </div>
@@ -243,7 +295,7 @@ function CategorySpendingBreakdown({
 }) {
   return (
     <div className="mb-5">
-      <h4 className="mb-3 text-xs font-medium text-slate-400">
+      <h4 className="mb-3 text-xs font-medium text-slate-600">
         Gastos por categoría
       </h4>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -258,11 +310,11 @@ function CategorySpendingBreakdown({
 
           return (
             <div
-              className="rounded-lg border border-slate-800 bg-slate-950/60 p-3"
+              className="rounded-lg border border-slate-200 bg-white p-3"
               key={category}
             >
               <p className="truncate text-[11px] text-slate-500">{category}</p>
-              <p className="mt-1 truncate text-sm font-medium text-slate-200">
+              <p className="mt-1 truncate text-sm font-medium text-slate-700">
                 {formatCurrency(total)}
               </p>
             </div>
@@ -307,11 +359,11 @@ function SavedExpenseInsights({
     <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
       <section
         aria-labelledby="expense-chart-title"
-        className="rounded-xl border border-slate-800 bg-slate-950/60 p-5 sm:p-6"
+        className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6"
       >
         <div>
           <h3
-            className="text-sm font-semibold text-white"
+            className="text-sm font-semibold text-slate-800"
             id="expense-chart-title"
           >
             Distribución de gastos
@@ -341,10 +393,10 @@ function SavedExpenseInsights({
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: "#0f172a",
-                      border: "1px solid #334155",
+                      backgroundColor: "#ffffff",
+                      border: "1px solid #e2e8f0",
                       borderRadius: "0.75rem",
-                      color: "#e2e8f0",
+                      color: "#334155",
                     }}
                     formatter={(value, name) => [
                       formatCurrency(Number(value)),
@@ -360,7 +412,7 @@ function SavedExpenseInsights({
                   className="flex items-center justify-between gap-3 text-xs"
                   key={entry.category}
                 >
-                  <span className="flex min-w-0 items-center gap-2 text-slate-300">
+                  <span className="flex min-w-0 items-center gap-2 text-slate-700">
                     <span
                       aria-hidden="true"
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -384,13 +436,13 @@ function SavedExpenseInsights({
 
       <section
         aria-labelledby="top-expenses-title"
-        className="rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.08] to-slate-950/80 p-5 sm:p-6"
+        className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm sm:p-6"
       >
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-300">
+        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
           Tus principales rubros
         </p>
         <h3
-          className="mt-2 text-lg font-semibold text-white"
+          className="mt-2 text-lg font-semibold text-slate-800"
           id="top-expenses-title"
         >
           Donde más gastas
@@ -403,25 +455,25 @@ function SavedExpenseInsights({
           <ol className="mt-5 space-y-3">
             {topCategories.map((entry, index) => (
               <li
-                className="flex items-center justify-between gap-3 rounded-lg border border-slate-800/80 bg-slate-950/60 p-3"
+                className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3"
                 key={entry.category}
               >
                 <span className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-300">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
                     {index + 1}
                   </span>
-                  <span className="truncate text-sm font-medium text-slate-200">
+                  <span className="truncate text-sm font-medium text-slate-700">
                     {entry.category}
                   </span>
                 </span>
-                <span className="shrink-0 text-sm font-semibold text-white">
+                <span className="shrink-0 text-sm font-semibold text-slate-800">
                   {formatCurrency(entry.amount)}
                 </span>
               </li>
             ))}
           </ol>
         ) : (
-          <p className="mt-5 rounded-lg border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-500">
+          <p className="mt-5 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500">
             Cuando guardes gastos, aquí verás tus principales rubros.
           </p>
         )}
@@ -1466,10 +1518,10 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-slate-100">
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-slate-800">
         <div
           aria-label="Verificando sesión"
-          className="h-8 w-8 animate-spin rounded-full border-2 border-slate-700 border-t-emerald-500"
+          className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500"
           role="status"
         />
       </main>
@@ -1478,11 +1530,11 @@ export default function DashboardPage() {
 
   if (!userEmail) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-slate-100">
-        <section className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 text-center shadow-2xl shadow-black/30 sm:p-8">
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-slate-800">
+        <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl shadow-slate-200/50 sm:p-8">
           <p
             aria-live="polite"
-            className="text-sm text-rose-300"
+            className="text-sm text-rose-700"
             role="alert"
           >
             {errorMsg || "No se pudo verificar tu sesión."}
@@ -1500,14 +1552,14 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-950/90">
+    <div className="min-h-screen bg-slate-50 text-slate-800">
+      <header className="border-b border-slate-200 bg-white/95">
         <nav
           aria-label="Navegación principal"
           className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-400">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-600">
               <svg
                 aria-hidden="true"
                 className="h-5 w-5"
@@ -1523,25 +1575,25 @@ export default function DashboardPage() {
                 />
               </svg>
             </div>
-            <span className="text-sm font-semibold tracking-[0.16em] text-white">
+            <span className="text-sm font-semibold tracking-[0.16em] text-slate-800">
               VAULTTRACKER
             </span>
           </div>
 
           <div className="flex items-center gap-3 sm:gap-5">
-            <span className="hidden text-sm text-slate-400 sm:inline">
+            <span className="hidden text-sm text-slate-600 sm:inline">
               {isDemoMode ? "Modo exploración" : userEmail}
             </span>
             {isDemoMode ? (
               <Link
-                className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-300 transition hover:border-emerald-500/50 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-500/50 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
                 href="/"
               >
                 Salir de demo
               </Link>
             ) : (
               <button
-                className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-300 transition hover:border-emerald-500/50 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-500/50 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={loggingOut}
                 onClick={() => void handleLogout()}
                 type="button"
@@ -1551,22 +1603,22 @@ export default function DashboardPage() {
             )}
           </div>
         </nav>
-        <p className="px-4 pb-3 text-right text-xs text-slate-400 sm:hidden">
+        <p className="px-4 pb-3 text-right text-xs text-slate-600 sm:hidden">
           {isDemoMode ? "Modo exploración" : userEmail}
         </p>
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         {isDemoMode && (
-          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-emerald-100/90">
-              <span className="font-semibold text-emerald-300">
+          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-emerald-800">
+              <span className="font-semibold text-emerald-700">
                 Estás en el Modo Demo Interactivo.
               </span>{" "}
               Los cambios no se guardarán permanentemente.
             </p>
             <Link
-              className="shrink-0 text-sm font-semibold text-emerald-300 underline decoration-emerald-500/40 underline-offset-4 transition hover:text-emerald-200"
+              className="shrink-0 text-sm font-semibold text-emerald-700 underline decoration-emerald-500/40 underline-offset-4 transition hover:text-emerald-700"
               href="/login"
             >
               Crear cuenta real
@@ -1577,10 +1629,10 @@ export default function DashboardPage() {
         {managementNotice && (
           <div
             aria-live="polite"
-            className="fixed right-4 top-4 z-[70] flex max-w-sm items-start gap-3 rounded-xl border border-emerald-500/30 bg-slate-900 px-4 py-3 text-sm text-emerald-200 shadow-2xl shadow-black/40"
+            className="fixed right-4 top-4 z-[70] flex max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-700 shadow-2xl shadow-slate-200/50"
             role="status"
           >
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
               <svg
                 aria-hidden="true"
                 className="h-3.5 w-3.5"
@@ -1600,21 +1652,21 @@ export default function DashboardPage() {
 
         <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-emerald-400">Resumen</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
+            <p className="text-sm font-medium text-emerald-600">Resumen</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-800">
               Tu espacio financiero
             </h1>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-slate-600">
               Administra y revisa tu información financiera desde un solo lugar.
             </p>
           </div>
           <div className="flex w-full flex-col gap-3 sm:max-w-xs">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-medium text-slate-400">
+              <span className="mb-1.5 block text-xs font-medium text-slate-600">
                 Período financiero
               </span>
               <select
-                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                 onChange={(event) => {
                   setSelectedMonth(event.target.value);
                   setHistoryPage(1);
@@ -1634,7 +1686,7 @@ export default function DashboardPage() {
               </select>
             </label>
             <button
-              className="self-start rounded-lg border border-rose-500/20 px-3 py-2 text-xs font-medium text-rose-300/80 transition hover:border-rose-500/50 hover:bg-rose-500/5 hover:text-rose-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-50 sm:self-end"
+              className="self-start rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700/80 transition hover:border-rose-500/50 hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-50 sm:self-end"
               disabled={isClearingSandbox || savedTransactions.length === 0}
               onClick={() => setIsSandboxConfirmOpen(true)}
               type="button"
@@ -1647,7 +1699,7 @@ export default function DashboardPage() {
         {errorMsg && (
           <p
             aria-live="polite"
-            className="mb-6 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+            className="mb-6 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
             role="alert"
           >
             {errorMsg}
@@ -1659,8 +1711,8 @@ export default function DashboardPage() {
             aria-live="polite"
             className={`mb-6 rounded-lg border px-4 py-3 text-sm ${
               saveMessage.type === "success"
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-rose-500/30 bg-rose-500/10 text-rose-300"
+                ? "border-emerald-200 bg-emerald-100 text-emerald-700"
+                : "border-rose-200 bg-rose-50 text-rose-700"
             }`}
             role={saveMessage.type === "success" ? "status" : "alert"}
           >
@@ -1670,16 +1722,16 @@ export default function DashboardPage() {
 
         <section
           aria-labelledby="statements-title"
-          className="rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl shadow-black/20 sm:p-10"
+          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-10"
         >
           <div className="mx-auto max-w-3xl">
             <h2
-              className="text-xl font-semibold text-white"
+              className="text-xl font-semibold text-slate-800"
               id="statements-title"
             >
               Cartolas bancarias
             </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
+            <p className="mt-2 text-sm leading-6 text-slate-600">
               Carga una cartola bancaria para preparar sus movimientos
               financieros.
             </p>
@@ -1696,10 +1748,10 @@ export default function DashboardPage() {
             />
 
             <div
-              className={`mt-6 rounded-xl border-2 border-dashed p-6 text-center transition-colors sm:p-10 ${
+              className={`mt-6 rounded-2xl border-2 border-dashed p-6 text-center transition-colors sm:p-10 ${
                 isDragging
-                  ? "border-emerald-500 bg-emerald-950/20"
-                  : "border-slate-700 bg-slate-950/40"
+                  ? "border-emerald-500 bg-emerald-50"
+                  : "border-slate-300 bg-white"
               }`}
               onDragEnter={(event) => {
                 event.preventDefault();
@@ -1716,7 +1768,7 @@ export default function DashboardPage() {
                 selectFile(event.dataTransfer.files[0]);
               }}
             >
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-400">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-600">
                 <svg
                   aria-hidden="true"
                   className="h-6 w-6"
@@ -1732,14 +1784,14 @@ export default function DashboardPage() {
                   />
                 </svg>
               </div>
-              <p className="mt-4 text-sm font-medium text-slate-200">
+              <p className="mt-4 text-sm font-medium text-slate-700">
                 Arrastra tu cartola y suéltala aquí
               </p>
               <p className="mt-1 text-xs text-slate-500">
                 Formatos admitidos: CSV o PDF
               </p>
               <button
-                className="mt-5 rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-emerald-500/50 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                className="mt-5 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-emerald-500/50 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
                 onClick={() => fileInputRef.current?.click()}
                 type="button"
               >
@@ -1750,7 +1802,7 @@ export default function DashboardPage() {
             {fileError && (
               <p
                 aria-live="polite"
-                className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+                className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
                 role="alert"
               >
                 {fileError}
@@ -1758,9 +1810,9 @@ export default function DashboardPage() {
             )}
 
             {file && (
-              <div className="mt-5 flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-5 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-slate-200">
+                  <p className="truncate text-sm font-medium text-slate-700">
                     {file.name}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
@@ -1769,7 +1821,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <button
-                    className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                    className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
                     onClick={() => {
                       setFile(null);
                       setFileError("");
@@ -1780,7 +1832,7 @@ export default function DashboardPage() {
                     Descartar
                   </button>
                   <button
-                    className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isUploading}
                     onClick={handleProcessFile}
                     type="button"
@@ -1804,12 +1856,12 @@ export default function DashboardPage() {
                 <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h3
-                      className="text-lg font-semibold text-white"
+                      className="text-lg font-semibold text-slate-800"
                       id="transactions-title"
                     >
                       Vista previa de transacciones
                     </h3>
-                    <p className="mt-1 text-sm text-slate-400">
+                    <p className="mt-1 text-sm text-slate-600">
                       {parsedTransactions.length}{" "}
                       {parsedTransactions.length === 1
                         ? "transacción encontrada"
@@ -1819,29 +1871,29 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="mb-5 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
-                    <p className="text-xs font-medium text-rose-300">
+                  <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-medium text-rose-700">
                       Total Gastos
                     </p>
-                    <p className="mt-2 text-lg font-semibold text-rose-200">
+                    <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-800">
                       {formatCurrency(totalExpenses)}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-                    <p className="text-xs font-medium text-emerald-300">
+                  <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-medium text-emerald-700">
                       Total Pagos
                     </p>
-                    <p className="mt-2 text-lg font-semibold text-emerald-200">
+                    <p className="mt-2 text-2xl font-semibold tracking-tight text-emerald-600">
                       {formatCurrency(totalIncome)}
                     </p>
                   </div>
-                  <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
-                    <p className="text-xs font-medium text-slate-400">
+                  <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                    <p className="text-xs font-medium text-slate-600">
                       Balance Net
                     </p>
                     <p
-                      className={`mt-2 text-lg font-semibold ${
-                        netBalance < 0 ? "text-rose-200" : "text-white"
+                      className={`mt-2 text-2xl font-semibold tracking-tight ${
+                        netBalance < 0 ? "text-rose-700" : "text-slate-800"
                       }`}
                     >
                       {formatCurrency(netBalance)}
@@ -1854,9 +1906,9 @@ export default function DashboardPage() {
                   transactions={parsedTransactions}
                 />
 
-                <div className="overflow-x-auto rounded-xl border border-slate-800">
-                  <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
-                    <thead className="bg-slate-950/70 text-xs uppercase tracking-wide text-slate-400">
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-100 text-left text-sm">
+                    <thead className="bg-white text-xs uppercase tracking-wide text-slate-600">
                       <tr>
                         <th className="px-4 py-3 font-medium" scope="col">
                           Fecha
@@ -1878,13 +1930,13 @@ export default function DashboardPage() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800 bg-slate-900">
+                    <tbody className="divide-y divide-slate-100 bg-white">
                       {parsedTransactions.map((transaction, index) => (
                         <tr
-                          className="text-slate-300"
+                          className="text-slate-700"
                           key={`${transaction.date}-${index}`}
                         >
-                          <td className="whitespace-nowrap px-4 py-3 text-slate-400">
+                          <td className="whitespace-nowrap px-4 py-3 text-slate-600">
                             {transaction.date}
                           </td>
                           <td className="min-w-48 px-4 py-3">
@@ -1893,7 +1945,7 @@ export default function DashboardPage() {
                           <td className="whitespace-nowrap px-4 py-3">
                             <select
                               aria-label={`Categoría de ${transaction.description}`}
-                              className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                               onChange={(event) => {
                                 const category = event.target.value;
                                 setParsedTransactions((currentTransactions) =>
@@ -1918,8 +1970,8 @@ export default function DashboardPage() {
                             <span
                               className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
                                 transaction.type === "INCOME"
-                                  ? "bg-emerald-500/10 text-emerald-300"
-                                  : "bg-rose-500/10 text-rose-300"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-rose-50 text-rose-700"
                               }`}
                             >
                               {transaction.type === "INCOME"
@@ -1930,8 +1982,8 @@ export default function DashboardPage() {
                           <td
                             className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
                               transaction.type === "EXPENSE"
-                                ? "text-rose-300"
-                                : "text-emerald-300"
+                                ? "text-rose-700"
+                                : "text-emerald-700"
                             }`}
                           >
                             {formatCurrency(transaction.amount)}
@@ -1944,7 +1996,7 @@ export default function DashboardPage() {
 
                 <div className="mt-5 flex flex-col items-start gap-2 sm:items-end">
                   <button
-                    className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isSaving}
                     onClick={() => void handleSaveToDatabase()}
                     type="button"
@@ -1959,19 +2011,19 @@ export default function DashboardPage() {
 
         <section
           aria-labelledby="budgets-title"
-          className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl shadow-black/20 sm:p-8"
+          className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-8"
         >
           <div className="mb-6">
-            <p className="text-sm font-medium text-emerald-400">
+            <p className="text-sm font-medium text-emerald-600">
               Planifica tus gastos
             </p>
             <h2
-              className="mt-1 text-xl font-semibold text-white"
+              className="mt-1 text-xl font-semibold text-slate-800"
               id="budgets-title"
             >
               Presupuestos Mensuales
             </h2>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-slate-600">
               Define límites para tus categorías principales y monitorea el
               gasto del período seleccionado.
             </p>
@@ -1980,7 +2032,7 @@ export default function DashboardPage() {
           {budgetError && (
             <p
               aria-live="polite"
-              className="mb-5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+              className="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
               role="alert"
             >
               {budgetError}
@@ -1993,12 +2045,12 @@ export default function DashboardPage() {
               className="flex min-h-32 items-center justify-center"
               role="status"
             >
-              <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-700 border-t-emerald-500" />
+              <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
             </div>
           ) : (
             <>
               {selectedMonth === "Todos" && (
-                <p className="mb-5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
+                <p className="mb-5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-700">
                   Selecciona un mes en el período financiero para ver el
                   progreso mensual. Los límites se pueden editar en cualquier
                   período.
@@ -2022,30 +2074,30 @@ export default function DashboardPage() {
                         : "bg-rose-400";
                   const progressTextColor =
                     ratio < 75
-                      ? "text-emerald-300"
+                      ? "text-emerald-700"
                       : ratio <= 95
-                        ? "text-amber-300"
-                        : "text-rose-300";
+                        ? "text-amber-700"
+                        : "text-rose-700";
 
                   return (
                     <article
-                      className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
+                      className="rounded-xl border border-slate-200 bg-white p-4"
                       key={category}
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                         <div className="min-w-0 flex-1">
                           <label
-                            className="mb-1.5 block text-sm font-medium text-slate-200"
+                            className="mb-1.5 block text-sm font-medium text-slate-700"
                             htmlFor={`budget-${category}`}
                           >
                             {category}
                           </label>
                           <div className="flex">
-                            <span className="inline-flex items-center rounded-l-lg border border-r-0 border-slate-700 bg-slate-900 px-3 text-sm text-slate-500">
+                            <span className="inline-flex items-center rounded-l-lg border border-r-0 border-slate-200 bg-white px-3 text-sm text-slate-500">
                               $
                             </span>
                             <input
-                              className="min-w-0 flex-1 rounded-r-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                              className="min-w-0 flex-1 rounded-r-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                               id={`budget-${category}`}
                               min="1"
                               onChange={(event) =>
@@ -2065,7 +2117,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <button
-                          className="rounded-lg border border-emerald-500/30 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:border-emerald-400/60 hover:bg-emerald-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-wait disabled:opacity-50"
+                          className="rounded-lg border border-emerald-200 px-4 py-2.5 text-sm font-medium text-emerald-700 transition hover:border-emerald-400/60 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-wait disabled:opacity-50"
                           disabled={
                             savingBudgetCategory !== null ||
                             !budgetDrafts[category]
@@ -2084,7 +2136,7 @@ export default function DashboardPage() {
                       {budget && selectedMonth !== "Todos" && (
                         <div className="mt-4">
                           <div className="mb-2 flex items-center justify-between gap-3 text-xs">
-                            <span className="text-slate-400">
+                            <span className="text-slate-600">
                               Gastado: {formatCurrency(spent)} de{" "}
                               {formatCurrency(monthlyLimit)}
                             </span>
@@ -2099,7 +2151,7 @@ export default function DashboardPage() {
                             aria-valuemax={100}
                             aria-valuemin={0}
                             aria-valuenow={Math.min(ratio, 100)}
-                            className="h-2.5 overflow-hidden rounded-full bg-slate-800"
+                            className="h-2.5 overflow-hidden rounded-full bg-slate-100"
                             role="progressbar"
                           >
                             <div
@@ -2119,20 +2171,20 @@ export default function DashboardPage() {
 
         <section
           aria-labelledby="history-title"
-          className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl shadow-black/20 sm:p-10"
+          className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-10"
         >
           <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-emerald-400">
+              <p className="text-sm font-medium text-emerald-600">
                 Tus movimientos
               </p>
               <h2
-                className="mt-1 text-xl font-semibold text-white"
+                className="mt-1 text-xl font-semibold text-slate-800"
                 id="history-title"
               >
                 Historial de Movimientos
               </h2>
-              <p className="mt-2 text-sm text-slate-400">
+              <p className="mt-2 text-sm text-slate-600">
                 Consulta las transacciones guardadas en tu cuenta.
               </p>
             </div>
@@ -2169,7 +2221,7 @@ export default function DashboardPage() {
           {historyError && (
             <p
               aria-live="polite"
-              className="mb-5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+              className="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
               role="alert"
             >
               {historyError}
@@ -2179,7 +2231,7 @@ export default function DashboardPage() {
           {categoryError && (
             <p
               aria-live="polite"
-              className="mb-5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+              className="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
               role="alert"
             >
               {categoryError}
@@ -2189,7 +2241,7 @@ export default function DashboardPage() {
           {managementError && (
             <p
               aria-live="polite"
-              className="mb-5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+              className="mb-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
               role="alert"
             >
               {managementError}
@@ -2199,8 +2251,8 @@ export default function DashboardPage() {
           {isLoadingHistory ? (
             <HistorySkeletons />
           ) : !historyError && savedTransactions.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 px-5 py-12 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-400">
+            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 py-12 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600">
                 <svg
                   aria-hidden="true"
                   className="h-6 w-6"
@@ -2215,7 +2267,7 @@ export default function DashboardPage() {
                   <path d="M8.5 8h7M8.5 12h7M8.5 16h4" />
                 </svg>
               </div>
-              <h3 className="mt-4 text-sm font-semibold text-slate-200">
+              <h3 className="mt-4 text-sm font-semibold text-slate-700">
                 Aún no tienes movimientos guardados
               </h3>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
@@ -2227,11 +2279,11 @@ export default function DashboardPage() {
             <>
               <section
                 aria-label="Filtros de transacciones"
-                className="mb-6 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5"
+                className="mb-6 rounded-xl border border-slate-200 bg-white p-4 sm:p-5"
               >
                 <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">
+                    <h3 className="text-sm font-semibold text-slate-800">
                       Filtrar movimientos
                     </h3>
                     <p className="mt-1 text-xs text-slate-500">
@@ -2239,7 +2291,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   <button
-                    className="self-start text-xs font-medium text-emerald-300 transition hover:text-emerald-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 sm:self-auto"
+                    className="self-start text-xs font-medium text-emerald-700 transition hover:text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 sm:self-auto"
                     onClick={() => {
                       setSelectedCategory("Todas");
                       setSelectedType("Todos");
@@ -2255,11 +2307,11 @@ export default function DashboardPage() {
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <label className="block">
-                    <span className="mb-1.5 block text-xs font-medium text-slate-400">
+                    <span className="mb-1.5 block text-xs font-medium text-slate-600">
                       Categoría
                     </span>
                     <select
-                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                       onChange={(event) =>
                         {
                           setSelectedCategory(event.target.value);
@@ -2278,11 +2330,11 @@ export default function DashboardPage() {
                   </label>
 
                   <label className="block">
-                    <span className="mb-1.5 block text-xs font-medium text-slate-400">
+                    <span className="mb-1.5 block text-xs font-medium text-slate-600">
                       Tipo
                     </span>
                     <select
-                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                       onChange={(event) => {
                         setSelectedType(event.target.value);
                         setHistoryPage(1);
@@ -2296,11 +2348,11 @@ export default function DashboardPage() {
                   </label>
 
                   <label className="block">
-                    <span className="mb-1.5 block text-xs font-medium text-slate-400">
+                    <span className="mb-1.5 block text-xs font-medium text-slate-600">
                       Buscar descripción
                     </span>
                     <input
-                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                       onChange={(event) => {
                         setSearchQuery(event.target.value);
                         setHistoryPage(1);
@@ -2324,29 +2376,29 @@ export default function DashboardPage() {
               </section>
 
               <div className="mb-6 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
-                  <p className="text-xs font-medium text-rose-300">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-medium text-rose-700">
                     Total Gastos
                   </p>
-                  <p className="mt-2 text-lg font-semibold text-rose-200">
+                  <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-800">
                     {formatCurrency(savedTotalExpenses)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-                  <p className="text-xs font-medium text-emerald-300">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-medium text-emerald-700">
                     Total Pagos/Abonos
                   </p>
-                  <p className="mt-2 text-lg font-semibold text-emerald-200">
+                  <p className="mt-2 text-2xl font-semibold tracking-tight text-emerald-600">
                     {formatCurrency(savedTotalIncome)}
                   </p>
                 </div>
-                <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
-                  <p className="text-xs font-medium text-slate-400">
+                <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+                  <p className="text-xs font-medium text-slate-600">
                     Balance General
                   </p>
                   <p
-                    className={`mt-2 text-lg font-semibold ${
-                      savedNetBalance < 0 ? "text-rose-200" : "text-white"
+                    className={`mt-2 text-2xl font-semibold tracking-tight ${
+                      savedNetBalance < 0 ? "text-rose-700" : "text-slate-800"
                     }`}
                   >
                     {formatCurrency(savedNetBalance)}
@@ -2364,143 +2416,111 @@ export default function DashboardPage() {
                 transactions={filteredTransactions}
               />
 
-              <div className="max-h-[28rem] overflow-auto rounded-xl border border-slate-800">
-                <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
-                  <thead className="sticky top-0 bg-slate-950 text-xs uppercase tracking-wide text-slate-400">
-                    <tr>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium" scope="col">
-                        Fecha
-                      </th>
-                      <th className="px-4 py-3 font-medium" scope="col">
-                        Descripción
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium" scope="col">
-                        Categoría
-                      </th>
-                      <th className="whitespace-nowrap px-4 py-3 font-medium" scope="col">
-                        Tipo
-                      </th>
-                      <th
-                        className="whitespace-nowrap px-4 py-3 text-right font-medium"
-                        scope="col"
-                      >
-                        Monto
-                      </th>
-                      <th className="px-4 py-3 text-right font-medium" scope="col">
-                        Acción
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800 bg-slate-900">
-                    {paginatedTransactions.map((transaction, index) => (
-                      <tr
-                        className="text-slate-300"
-                        key={
-                          transaction.id ??
-                          `${transaction.date}-${transaction.description}-${index}`
-                        }
-                      >
-                        <td className="whitespace-nowrap px-4 py-3 text-slate-400">
-                          {transaction.date}
-                        </td>
-                        <td className="min-w-48 px-4 py-3">
+              <div className="max-h-[34rem] space-y-2 overflow-auto">
+                {paginatedTransactions.map((transaction, index) => (
+                  <article
+                    className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm shadow-slate-200/40 transition hover:border-emerald-100 sm:gap-4 sm:p-4"
+                    key={
+                      transaction.id ??
+                      `${transaction.date}-${transaction.description}-${index}`
+                    }
+                  >
+                    <MerchantLogo description={transaction.description} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p className="truncate text-sm font-semibold text-slate-800">
                           {transaction.description}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3">
-                          <select
-                            aria-label={`Categoría de ${transaction.description}`}
-                            className="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-wait disabled:opacity-60"
-                            disabled={savingCategoryId !== null}
-                            onChange={(event) =>
-                              void handleSavedCategoryChange(
-                                transaction,
-                                event.target.value,
-                              )
-                            }
-                            value={
-                              isTransactionCategory(transaction.category)
-                                ? transaction.category
-                                : assignAutoCategory(transaction.description)
-                            }
-                          >
-                            {TRANSACTION_CATEGORIES.map((category) => (
-                              <option key={category} value={category}>
-                                {category}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                              transaction.type === "INCOME"
-                                ? "bg-emerald-500/10 text-emerald-300"
-                                : "bg-rose-500/10 text-rose-300"
-                            }`}
-                          >
-                            {transaction.type === "INCOME"
-                              ? "Abono / Pago"
-                              : "Compra / Gasto"}
-                          </span>
-                        </td>
-                        <td
-                          className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
-                            transaction.type === "EXPENSE"
-                              ? "text-rose-300"
-                              : "text-emerald-300"
+                        </p>
+                        <span className="text-[11px] text-slate-400">
+                          {transaction.date}
+                        </span>
+                      </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <select
+                          aria-label={`Categoría de ${transaction.description}`}
+                          className="max-w-44 rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[11px] text-slate-600 outline-none transition focus:border-emerald-300 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-wait disabled:opacity-60"
+                          disabled={savingCategoryId !== null}
+                          onChange={(event) =>
+                            void handleSavedCategoryChange(
+                              transaction,
+                              event.target.value,
+                            )
+                          }
+                          value={
+                            isTransactionCategory(transaction.category)
+                              ? transaction.category
+                              : assignAutoCategory(transaction.description)
+                          }
+                        >
+                          {TRANSACTION_CATEGORIES.map((category) => (
+                            <option key={category} value={category}>
+                              {category}
+                            </option>
+                          ))}
+                        </select>
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-medium ${
+                            transaction.type === "INCOME"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-slate-100 text-slate-600"
                           }`}
                         >
-                          {formatCurrency(Number(transaction.amount))}
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right">
-                          <button
-                            aria-label={`Eliminar ${transaction.description}`}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition hover:border-rose-500/50 hover:bg-rose-500/10 hover:text-rose-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-50"
-                            disabled={
-                              deletingTransactionId === transaction.id ||
-                              transaction.id === undefined
-                            }
-                            onClick={() =>
-                              void handleDeleteTransaction(transaction)
-                            }
-                            type="button"
+                          {transaction.type === "INCOME" ? "Ingreso" : "Gasto"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <p
+                        className={`whitespace-nowrap text-sm font-semibold sm:text-base ${
+                          transaction.type === "INCOME"
+                            ? "text-emerald-600"
+                            : "text-slate-800"
+                        }`}
+                      >
+                        {transaction.type === "INCOME" ? "+" : "−"}
+                        {formatCurrency(Number(transaction.amount))}
+                      </p>
+                      <button
+                        aria-label={`Eliminar ${transaction.description}`}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-50"
+                        disabled={
+                          deletingTransactionId === transaction.id ||
+                          transaction.id === undefined
+                        }
+                        onClick={() =>
+                          void handleDeleteTransaction(transaction)
+                        }
+                        type="button"
+                      >
+                        {deletingTransactionId === transaction.id ? (
+                          <span
+                            aria-label="Eliminando"
+                            className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-rose-500"
+                            role="status"
+                          />
+                        ) : (
+                          <svg
+                            aria-hidden="true"
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.7"
+                            viewBox="0 0 24 24"
                           >
-                            {deletingTransactionId === transaction.id ? (
-                              <span
-                                aria-label="Eliminando"
-                                className="h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-rose-400"
-                                role="status"
-                              />
-                            ) : (
-                              <svg
-                                aria-hidden="true"
-                                className="h-4 w-4"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="1.7"
-                                viewBox="0 0 24 24"
-                              >
-                                <path d="M3.5 6.5h17M9 6.5V4h6v2.5m3.5 0-.8 13.1a1.5 1.5 0 0 1-1.5 1.4H7.8a1.5 1.5 0 0 1-1.5-1.4L5.5 6.5m4 4v6m5-6v6" />
-                              </svg>
-                            )}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredTransactions.length === 0 && (
-                      <tr>
-                        <td
-                          className="px-4 py-8 text-center text-sm text-slate-500"
-                          colSpan={6}
-                        >
-                          No hay movimientos que coincidan con los filtros.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                            <path d="M3.5 6.5h17M9 6.5V4h6v2.5m3.5 0-.8 13.1a1.5 1.5 0 0 1-1.5 1.4H7.8a1.5 1.5 0 0 1-1.5-1.4L5.5 6.5m4 4v6m5-6v6" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+                {filteredTransactions.length === 0 && (
+                  <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                    No hay movimientos que coincidan con los filtros.
+                  </p>
+                )}
               </div>
 
               {filteredTransactions.length > 0 && (
@@ -2514,7 +2534,7 @@ export default function DashboardPage() {
                   </p>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <button
-                      className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-emerald-500/50 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-emerald-500/50 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
                       disabled={currentHistoryPage === 1}
                       onClick={() =>
                         setHistoryPage(Math.max(1, currentHistoryPage - 1))
@@ -2532,7 +2552,7 @@ export default function DashboardPage() {
                         className={`h-9 min-w-9 rounded-lg border px-3 text-xs font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 ${
                           pageNumber === currentHistoryPage
                             ? "border-emerald-500 bg-emerald-500 text-slate-950"
-                            : "border-slate-700 text-slate-300 hover:border-emerald-500/50 hover:text-white"
+                            : "border-slate-200 text-slate-700 hover:border-emerald-500/50 hover:text-slate-800"
                         }`}
                         key={pageNumber}
                         onClick={() => setHistoryPage(pageNumber)}
@@ -2542,7 +2562,7 @@ export default function DashboardPage() {
                       </button>
                     ))}
                     <button
-                      className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-emerald-500/50 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-emerald-500/50 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
                       disabled={currentHistoryPage === historyPageCount}
                       onClick={() =>
                         setHistoryPage(
@@ -2562,7 +2582,7 @@ export default function DashboardPage() {
 
         {isManualFormOpen && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-white p-4 backdrop-blur-sm"
             onMouseDown={(event) => {
               if (event.target === event.currentTarget && !isSavingManual) {
                 setIsManualFormOpen(false);
@@ -2572,27 +2592,27 @@ export default function DashboardPage() {
             <section
               aria-labelledby="manual-transaction-title"
               aria-modal="true"
-              className="my-auto w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl shadow-black/50 sm:p-8"
+              className="my-auto w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl shadow-black/50 sm:p-8"
               role="dialog"
             >
               <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-emerald-400">
+                  <p className="text-sm font-medium text-emerald-600">
                     Registro manual
                   </p>
                   <h2
-                    className="mt-1 text-xl font-semibold text-white"
+                    className="mt-1 text-xl font-semibold text-slate-800"
                     id="manual-transaction-title"
                   >
                     Agregar movimiento
                   </h2>
-                  <p className="mt-2 text-sm text-slate-400">
+                  <p className="mt-2 text-sm text-slate-600">
                     Registra un gasto o ingreso en tu historial.
                   </p>
                 </div>
                 <button
                   aria-label="Cerrar formulario"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition hover:border-slate-500 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:opacity-50"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:border-slate-500 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:opacity-50"
                   disabled={isSavingManual}
                   onClick={() => setIsManualFormOpen(false)}
                   type="button"
@@ -2619,11 +2639,11 @@ export default function DashboardPage() {
               >
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
-                    <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-700">
                       Fecha
                     </span>
                     <input
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                       onChange={(event) =>
                         setManualTransaction((currentTransaction) => ({
                           ...currentTransaction,
@@ -2637,11 +2657,11 @@ export default function DashboardPage() {
                   </label>
 
                   <label className="block">
-                    <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-700">
                       Tipo
                     </span>
                     <select
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                       onChange={(event) =>
                         setManualTransaction((currentTransaction) => ({
                           ...currentTransaction,
@@ -2660,11 +2680,11 @@ export default function DashboardPage() {
                 </div>
 
                 <label className="block">
-                  <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                  <span className="mb-1.5 block text-sm font-medium text-slate-700">
                     Descripción
                   </span>
                   <input
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                     maxLength={160}
                     onChange={(event) =>
                       setManualTransaction((currentTransaction) => ({
@@ -2680,11 +2700,11 @@ export default function DashboardPage() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
-                    <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-700">
                       Monto (CLP)
                     </span>
                     <input
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                       min="1"
                       onChange={(event) =>
                         setManualTransaction((currentTransaction) => ({
@@ -2701,11 +2721,11 @@ export default function DashboardPage() {
                   </label>
 
                   <label className="block">
-                    <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-700">
                       Categoría
                     </span>
                     <select
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                       onChange={(event) =>
                         setManualTransaction((currentTransaction) => {
                           const category = event.target.value;
@@ -2731,7 +2751,7 @@ export default function DashboardPage() {
                 {manualFormError && (
                   <p
                     aria-live="polite"
-                    className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+                    className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
                     role="alert"
                   >
                     {manualFormError}
@@ -2740,7 +2760,7 @@ export default function DashboardPage() {
 
                 <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
                   <button
-                    className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-slate-500 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:opacity-50"
+                    className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-500 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:opacity-50"
                     disabled={isSavingManual}
                     onClick={() => setIsManualFormOpen(false)}
                     type="button"
@@ -2762,7 +2782,7 @@ export default function DashboardPage() {
 
         {isSandboxConfirmOpen && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-white p-4 backdrop-blur-sm"
             onMouseDown={(event) => {
               if (event.target === event.currentTarget && !isClearingSandbox) {
                 setIsSandboxConfirmOpen(false);
@@ -2772,10 +2792,10 @@ export default function DashboardPage() {
             <section
               aria-labelledby="sandbox-confirm-title"
               aria-modal="true"
-              className="w-full max-w-md rounded-2xl border border-rose-500/20 bg-slate-900 p-6 shadow-2xl shadow-black/50 sm:p-7"
+              className="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 shadow-2xl shadow-black/50 sm:p-7"
               role="alertdialog"
             >
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-700">
                 <svg
                   aria-hidden="true"
                   className="h-5 w-5"
@@ -2790,14 +2810,14 @@ export default function DashboardPage() {
                 </svg>
               </div>
               <h2
-                className="mt-4 text-lg font-semibold text-white"
+                className="mt-4 text-lg font-semibold text-slate-800"
                 id="sandbox-confirm-title"
               >
                 ¿Borrar los datos de prueba?
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+              <p className="mt-2 text-sm leading-6 text-slate-600">
                 Se eliminarán permanentemente las{" "}
-                <span className="font-medium text-slate-200">
+                <span className="font-medium text-slate-700">
                   {savedTransactions.length} transacciones
                 </span>{" "}
                 de tu cuenta. Esta acción no se puede deshacer y no modificará
@@ -2807,7 +2827,7 @@ export default function DashboardPage() {
               {managementError && (
                 <p
                   aria-live="polite"
-                  className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+                  className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
                   role="alert"
                 >
                   {managementError}
@@ -2816,7 +2836,7 @@ export default function DashboardPage() {
 
               <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
-                  className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-slate-500 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 disabled:opacity-50"
+                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-500 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 disabled:opacity-50"
                   disabled={isClearingSandbox}
                   onClick={() => setIsSandboxConfirmOpen(false)}
                   type="button"
@@ -2824,7 +2844,7 @@ export default function DashboardPage() {
                   Cancelar
                 </button>
                 <button
-                  className="rounded-lg bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-60"
+                  className="rounded-lg bg-rose-500 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-rose-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-60"
                   disabled={isClearingSandbox}
                   onClick={() => void handleClearSandboxData()}
                   type="button"
