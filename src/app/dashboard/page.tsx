@@ -1558,7 +1558,11 @@ export default function DashboardPage() {
           aria-label="Navegación principal"
           className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8"
         >
-          <div className="flex items-center gap-3">
+          <Link
+            aria-label="VaultTracker, volver al inicio"
+            className="flex items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-500"
+            href="/"
+          >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-600">
               <svg
                 aria-hidden="true"
@@ -1578,7 +1582,7 @@ export default function DashboardPage() {
             <span className="text-sm font-semibold tracking-[0.16em] text-slate-800">
               VAULTTRACKER
             </span>
-          </div>
+          </Link>
 
           <div className="flex items-center gap-3 sm:gap-5">
             <span className="hidden text-sm text-slate-600 sm:inline">

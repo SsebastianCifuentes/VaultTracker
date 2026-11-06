@@ -1,8 +1,10 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -94,6 +96,13 @@ export default function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-12 text-slate-800">
+      <Link
+        className="absolute left-4 top-4 z-10 inline-flex items-center gap-2 text-sm font-medium text-slate-500 transition hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-500 sm:left-8 sm:top-8"
+        href="/"
+      >
+        <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+        Volver al inicio
+      </Link>
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-emerald-200/30 blur-3xl"

@@ -19,12 +19,12 @@ interface Movement {
   id: number;
   merchant: string;
   initial: string;
+  src?: string;
   date: string;
   detail: string;
   amount: number;
   category: MovementCategory;
   kind: "income" | "expense";
-  logoClass: string;
 }
 
 const movements: Movement[] = [
@@ -32,45 +32,45 @@ const movements: Movement[] = [
     id: 1,
     merchant: "McDonald's",
     initial: "M",
+    src: "https://logo.clearbit.com/mcdonalds.com",
     date: "Hoy, 12:42",
     detail: "Restaurante · Tarjeta débito",
     amount: -8990,
     category: "Comida",
     kind: "expense",
-    logoClass: "bg-[#da291c] text-white",
   },
   {
     id: 2,
     merchant: "Starbucks",
     initial: "S",
+    src: "https://logo.clearbit.com/starbucks.com",
     date: "Ayer, 09:18",
     detail: "Cafetería · Tarjeta débito",
     amount: -5490,
     category: "Comida",
     kind: "expense",
-    logoClass: "bg-[#00754a] text-white",
   },
   {
     id: 3,
     merchant: "Lider",
     initial: "L",
+    src: "https://logo.clearbit.com/lider.cl",
     date: "Ayer, 18:07",
     detail: "Supermercado · Tarjeta crédito",
     amount: -62490,
     category: "Supermercado",
     kind: "expense",
-    logoClass: "bg-[#0874c9] text-white",
   },
   {
     id: 4,
     merchant: "Uber",
     initial: "U",
+    src: "https://logo.clearbit.com/uber.com",
     date: "05 nov, 20:31",
     detail: "Transporte · Tarjeta débito",
     amount: -7350,
     category: "Transporte",
     kind: "expense",
-    logoClass: "border border-slate-200 bg-slate-100 text-slate-800",
   },
   {
     id: 5,
@@ -81,7 +81,6 @@ const movements: Movement[] = [
     amount: 1250000,
     category: "Ingresos",
     kind: "income",
-    logoClass: "bg-emerald-100 text-emerald-700",
   },
 ];
 
@@ -94,13 +93,67 @@ const filters: CategoryFilter[] = [
 ];
 
 const banks = [
-  { name: "Santander", initial: "S", style: "bg-[#ec0000] text-white" },
-  { name: "Banco de Chile", initial: "CH", style: "bg-slate-100 text-slate-500" },
-  { name: "BancoEstado", initial: "BE", style: "bg-slate-100 text-slate-500" },
-  { name: "Bci", initial: "Bci", style: "bg-slate-100 text-slate-500" },
-  { name: "Scotiabank", initial: "S", style: "bg-slate-100 text-slate-500" },
-  { name: "Falabella", initial: "F", style: "bg-slate-100 text-slate-500" },
+  {
+    name: "Santander",
+    initial: "S",
+    src: "https://logo.clearbit.com/santander.cl",
+  },
+  {
+    name: "Banco de Chile",
+    initial: "CH",
+    src: "https://logo.clearbit.com/bancochile.cl",
+  },
+  {
+    name: "BancoEstado",
+    initial: "BE",
+    src: "https://logo.clearbit.com/bancoestado.cl",
+  },
+  { name: "Bci", initial: "B", src: "https://logo.clearbit.com/bci.cl" },
+  {
+    name: "Scotiabank",
+    initial: "S",
+    src: "https://logo.clearbit.com/scotiabankchile.cl",
+  },
+  {
+    name: "Falabella",
+    initial: "F",
+    src: "https://logo.clearbit.com/bancofalabella.cl",
+  },
 ];
+
+const LogoConFallback = ({
+  src,
+  alt,
+  initial,
+  className,
+}: {
+  src: string;
+  alt: string;
+  initial: string;
+  className: string;
+}) => {
+  const [error, setError] = useState(false);
+
+  if (error) {
+    return (
+      <div
+        className={`flex items-center justify-center bg-slate-100 text-slate-500 font-bold ${className}`}
+      >
+        {initial}
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      className={`object-cover bg-white ${className}`}
+      onError={() => setError(true)}
+    />
+  );
+};
 
 function BrandMark() {
   return (
@@ -324,13 +377,12 @@ export default function Home() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.06, duration: 0.3 }}
               >
-                <span
-                  className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold ${
-                    bank.style
-                  } ${index > 0 ? "grayscale" : ""}`}
-                >
-                  {bank.initial}
-                </span>
+                <LogoConFallback
+                  src={bank.src}
+                  alt={bank.name}
+                  initial={bank.initial}
+                  className="h-10 w-10 rounded-full border border-slate-200"
+                />
                 <div>
                   <p
                     className={`text-xs font-semibold ${
@@ -461,12 +513,25 @@ export default function Home() {
                 whileHover={reduceMotion ? undefined : { x: 3 }}
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <span
-                    aria-hidden="true"
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${movement.logoClass}`}
-                  >
-                    {movement.initial}
-                  </span>
+                  {movement.src ? (
+                    <LogoConFallback
+                      src={movement.src}
+                      alt={
+                        movement.merchant === "McDonald's"
+                          ? "McDonalds"
+                          : movement.merchant
+                      }
+                      initial={movement.initial}
+                      className="h-10 w-10 rounded-full"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-bold text-emerald-700"
+                    >
+                      {movement.initial}
+                    </span>
+                  )}
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-800">
                       {movement.merchant}
