@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Cell,
   Pie,
@@ -97,6 +98,30 @@ const initialDemoTransactions: DemoTransaction[] = [
     type: "INCOME",
     category: "Pagos",
   },
+  {
+    id: 7,
+    date: "31 oct",
+    description: "Cinemark · entradas",
+    amount: 14500,
+    type: "EXPENSE",
+    category: "Ocio",
+  },
+  {
+    id: 8,
+    date: "30 oct",
+    description: "Enel · cuenta de luz",
+    amount: 32800,
+    type: "EXPENSE",
+    category: "Vivienda/Gastos Comunes",
+  },
+  {
+    id: 9,
+    date: "29 oct",
+    description: "Restaurante Sandoz",
+    amount: 26700,
+    type: "EXPENSE",
+    category: "Restaurantes",
+  },
 ];
 
 const features = [
@@ -162,6 +187,7 @@ function BrandMark({ small = false }: { small?: boolean }) {
 }
 
 export default function Home() {
+  const shouldReduceMotion = useReducedMotion();
   const [transactions, setTransactions] = useState(initialDemoTransactions);
   const [selectedCategory, setSelectedCategory] = useState<
     "Todas" | DemoCategory
@@ -187,7 +213,7 @@ export default function Home() {
         .filter((category) => category !== "Pagos")
         .map((category) => ({
           category,
-          amount: transactions
+          amount: filteredTransactions
             .filter(
               (transaction) =>
                 transaction.type === "EXPENSE" &&
@@ -196,28 +222,54 @@ export default function Home() {
             .reduce((total, transaction) => total + transaction.amount, 0),
         }))
         .filter((entry) => entry.amount > 0),
-    [transactions],
+    [filteredTransactions],
   );
-  const totalExpenses = filteredTransactions
-    .filter((transaction) => transaction.type === "EXPENSE")
-    .reduce((total, transaction) => total + transaction.amount, 0);
-  const totalIncome = filteredTransactions
-    .filter((transaction) => transaction.type === "INCOME")
-    .reduce((total, transaction) => total + transaction.amount, 0);
+  const totalExpenses = useMemo(
+    () =>
+      filteredTransactions
+        .filter((transaction) => transaction.type === "EXPENSE")
+        .reduce((total, transaction) => total + transaction.amount, 0),
+    [filteredTransactions],
+  );
+  const totalIncome = useMemo(
+    () =>
+      filteredTransactions
+        .filter((transaction) => transaction.type === "INCOME")
+        .reduce((total, transaction) => total + transaction.amount, 0),
+    [filteredTransactions],
+  );
   const netBalance = totalIncome - totalExpenses;
-  const budgetSpending = transactions
-    .filter(
-      (transaction) =>
-        transaction.type === "EXPENSE" &&
-        (transaction.category === "Ocio" ||
-          transaction.category === "Restaurantes" ||
-          transaction.category === "Supermercado"),
-    )
-    .reduce<Record<string, number>>((totals, transaction) => {
-      totals[transaction.category] =
-        (totals[transaction.category] ?? 0) + transaction.amount;
-      return totals;
-    }, {});
+  const budgetSpending = useMemo(
+    () =>
+      filteredTransactions
+        .filter(
+          (transaction) =>
+            transaction.type === "EXPENSE" &&
+            (transaction.category === "Ocio" ||
+              transaction.category === "Restaurantes" ||
+              transaction.category === "Supermercado"),
+        )
+        .reduce<Record<string, number>>((totals, transaction) => {
+          totals[transaction.category] =
+            (totals[transaction.category] ?? 0) + transaction.amount;
+          return totals;
+        }, {}),
+    [filteredTransactions],
+  );
+
+  function updateTransactionCategory(id: number, category: DemoCategory) {
+    setTransactions((currentTransactions) =>
+      currentTransactions.map((transaction) =>
+        transaction.id === id ? { ...transaction, category } : transaction,
+      ),
+    );
+  }
+
+  function removeTransaction(id: number) {
+    setTransactions((currentTransactions) =>
+      currentTransactions.filter((transaction) => transaction.id !== id),
+    );
+  }
 
   function formatCurrency(amount: number) {
     return new Intl.NumberFormat("es-CL", {
@@ -258,8 +310,18 @@ export default function Home() {
         </nav>
       </header>
 
-      <section className="relative mx-auto grid w-full max-w-7xl items-center gap-14 px-5 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-24 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pb-32 lg:pt-28">
-        <div className="max-w-2xl">
+      <motion.section
+        animate={{ opacity: 1, y: 0 }}
+        className="relative mx-auto grid w-full max-w-7xl items-center gap-14 px-5 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-24 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pb-32 lg:pt-28"
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
+        transition={{ duration: 0.65, ease: "easeOut" }}
+      >
+        <motion.div
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-2xl"
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
+          transition={{ delay: 0.12, duration: 0.55, ease: "easeOut" }}
+        >
           <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-2 text-xs font-medium text-emerald-300">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             Claridad para tus decisiones financieras
@@ -274,27 +336,34 @@ export default function Home() {
             gastos.
           </p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-            <Link
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-3.5 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
-              href="/login"
+            <motion.div
+              whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
             >
-              Comenzar ahora
-              <svg
-                aria-hidden="true"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
+              <Link
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-3.5 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+                href="/login"
               >
-                <path d="M5 12h14m-6-6 6 6-6 6" />
-              </svg>
-            </Link>
-            <a
+                Comenzar ahora
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M5 12h14m-6-6 6 6-6 6" />
+                </svg>
+              </Link>
+            </motion.div>
+            <motion.a
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-400/[0.07] px-5 py-3.5 text-sm font-semibold text-emerald-200 transition hover:border-emerald-300/60 hover:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
               href="#demo-interactivo"
+              whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
             >
               Explorar resumen interactivo
               <svg
@@ -309,13 +378,15 @@ export default function Home() {
               >
                 <path d="M12 5v14m-7-7 7 7 7-7" />
               </svg>
-            </a>
-            <a
+            </motion.a>
+            <motion.a
               className="inline-flex items-center justify-center rounded-lg border border-slate-700 px-5 py-3.5 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
               href="#caracteristicas"
+              whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+              whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
             >
               Conoce la plataforma
-            </a>
+            </motion.a>
           </div>
           <div className="mt-8 flex items-center gap-3 text-xs text-slate-500">
             <svg
@@ -333,9 +404,14 @@ export default function Home() {
             </svg>
             Tus finanzas personales, siempre bajo tu control
           </div>
-        </div>
+        </motion.div>
 
-        <div className="relative mx-auto w-full max-w-xl lg:ml-auto">
+        <motion.div
+          animate={{ opacity: 1, y: 0 }}
+          className="relative mx-auto w-full max-w-xl lg:ml-auto"
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 24 }}
+          transition={{ delay: 0.28, duration: 0.6, ease: "easeOut" }}
+        >
           <div
             aria-hidden="true"
             className="absolute -inset-5 rounded-[2rem] bg-emerald-500/[0.07] blur-2xl"
@@ -454,16 +530,26 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </motion.div>
+      </motion.section>
 
-      <section
+      <motion.section
         aria-labelledby="interactive-demo-title"
         className="relative border-y border-slate-800/80 bg-slate-900/35"
         id="demo-interactivo"
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 28 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.12 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
       >
         <div className="mx-auto w-full max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:py-24">
-          <div className="mx-auto mb-10 max-w-3xl text-center">
+          <motion.div
+            className="mx-auto mb-10 max-w-3xl text-center"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
             <p className="text-sm font-medium text-emerald-400">
               Explora con datos de ejemplo
             </p>
@@ -477,9 +563,15 @@ export default function Home() {
               Filtra movimientos, cambia categorías y ajusta tus límites. Todo
               lo que ves es interactivo y ocurre en esta página.
             </p>
-          </div>
+          </motion.div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-2xl shadow-black/20 sm:p-7 lg:p-8">
+          <motion.div
+            className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-2xl shadow-black/20 sm:p-7 lg:p-8"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 22 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.1 }}
+            transition={{ delay: 0.1, duration: 0.55 }}
+          >
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-white">
@@ -513,38 +605,69 @@ export default function Home() {
             </div>
 
             <div className="mb-5 grid gap-3 sm:grid-cols-3">
-              <article className="rounded-xl border border-rose-500/15 bg-rose-500/[0.04] p-4">
+              <motion.article
+                className="rounded-xl border border-rose-500/15 bg-rose-500/[0.04] p-4"
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+              >
                 <p className="text-xs font-medium text-rose-300">
                   Total Gastos
                 </p>
-                <p className="mt-2 text-xl font-semibold text-white">
+                <motion.p
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-xl font-semibold text-white"
+                  initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
+                  key={totalExpenses}
+                  transition={{ duration: 0.2 }}
+                >
                   {formatCurrency(totalExpenses)}
-                </p>
-              </article>
-              <article className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] p-4">
+                </motion.p>
+              </motion.article>
+              <motion.article
+                className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] p-4"
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+              >
                 <p className="text-xs font-medium text-emerald-300">
                   Total Pagos
                 </p>
-                <p className="mt-2 text-xl font-semibold text-white">
+                <motion.p
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-xl font-semibold text-white"
+                  initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
+                  key={totalIncome}
+                  transition={{ duration: 0.2 }}
+                >
                   {formatCurrency(totalIncome)}
-                </p>
-              </article>
-              <article className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
+                </motion.p>
+              </motion.article>
+              <motion.article
+                className="rounded-xl border border-slate-700 bg-slate-950/60 p-4"
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+              >
                 <p className="text-xs font-medium text-slate-400">
                   Balance Neto
                 </p>
-                <p
+                <motion.p
+                  animate={{ opacity: 1, y: 0 }}
                   className={`mt-2 text-xl font-semibold ${
                     netBalance < 0 ? "text-rose-300" : "text-white"
                   }`}
+                  initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
+                  key={netBalance}
+                  transition={{ duration: 0.2 }}
                 >
                   {formatCurrency(netBalance)}
-                </p>
-              </article>
+                </motion.p>
+              </motion.article>
             </div>
 
             <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-              <article className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5">
+              <motion.article
+                className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5"
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.01 }}
+              >
                 <div>
                   <h3 className="text-sm font-semibold text-white">
                     Distribución de gastos
@@ -561,6 +684,7 @@ export default function Home() {
                           data={expenseDistribution}
                           dataKey="amount"
                           innerRadius="57%"
+                          isAnimationActive={!shouldReduceMotion}
                           nameKey="category"
                           outerRadius="84%"
                           paddingAngle={3}
@@ -610,7 +734,7 @@ export default function Home() {
                       );
                       return (
                         <li key={entry.category}>
-                          <button
+                          <motion.button
                             aria-pressed={selectedCategory === entry.category}
                             className="flex w-full items-center justify-between gap-2 text-left text-xs"
                             onClick={() =>
@@ -621,6 +745,8 @@ export default function Home() {
                               )
                             }
                             type="button"
+                            whileHover={shouldReduceMotion ? undefined : { x: 2 }}
+                            whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
                           >
                             <span className="flex min-w-0 items-center gap-2 text-slate-300">
                               <span
@@ -635,15 +761,18 @@ export default function Home() {
                             <span className="shrink-0 text-slate-500">
                               {((entry.amount / allExpenses) * 100).toFixed(0)}%
                             </span>
-                          </button>
+                          </motion.button>
                         </li>
                       );
                     })}
                   </ul>
                 </div>
-              </article>
+              </motion.article>
 
-              <article className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5">
+              <motion.article
+                className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5"
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.005 }}
+              >
                 <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-white">
@@ -677,11 +806,20 @@ export default function Home() {
                         >
                           Monto
                         </th>
+                        <th className="px-3 py-3" scope="col">
+                          <span className="sr-only">Acciones</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/80">
                       {filteredTransactions.map((transaction) => (
-                        <tr className="text-slate-300" key={transaction.id}>
+                        <motion.tr
+                          className="text-slate-300"
+                          key={transaction.id}
+                          whileHover={shouldReduceMotion ? undefined : { scale: 1.005, backgroundColor: "rgba(30, 41, 59, 0.45)" }}
+                          whileTap={shouldReduceMotion ? undefined : { scale: 0.995 }}
+                          transition={{ duration: 0.15 }}
+                        >
                           <td className="whitespace-nowrap px-3 py-3 text-slate-500">
                             {transaction.date}
                           </td>
@@ -699,12 +837,9 @@ export default function Home() {
                                   demoCategories.find(
                                     (option) => option === event.target.value,
                                   ) ?? "Ocio";
-                                setTransactions((currentTransactions) =>
-                                  currentTransactions.map((currentTransaction) =>
-                                    currentTransaction.id === transaction.id
-                                      ? { ...currentTransaction, category }
-                                      : currentTransaction,
-                                  ),
+                                updateTransactionCategory(
+                                  transaction.id,
+                                  category,
                                 );
                               }}
                               value={transaction.category}
@@ -726,13 +861,37 @@ export default function Home() {
                             {transaction.type === "INCOME" ? "+" : "−"}
                             {formatCurrency(transaction.amount)}
                           </td>
-                        </tr>
+                          <td className="whitespace-nowrap px-3 py-2 text-right">
+                            <motion.button
+                              aria-label={`Eliminar ${transaction.description} de la demo`}
+                              className="rounded-md p-1.5 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+                              onClick={() => removeTransaction(transaction.id)}
+                              title={`Eliminar ${transaction.description}`}
+                              type="button"
+                              whileHover={shouldReduceMotion ? undefined : { scale: 1.1 }}
+                              whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
+                            >
+                              <svg
+                                aria-hidden="true"
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.7"
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3" />
+                              </svg>
+                            </motion.button>
+                          </td>
+                        </motion.tr>
                       ))}
                       {filteredTransactions.length === 0 && (
                         <tr>
                           <td
                             className="px-3 py-8 text-center text-slate-500"
-                            colSpan={4}
+                            colSpan={5}
                           >
                             No hay movimientos en esta categoría.
                           </td>
@@ -741,7 +900,7 @@ export default function Home() {
                     </tbody>
                   </table>
                 </div>
-              </article>
+              </motion.article>
             </div>
 
             <article className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5">
@@ -773,28 +932,36 @@ export default function Home() {
                           : "text-rose-300";
 
                     return (
-                      <div
+                      <motion.div
                         className="rounded-lg border border-slate-800 bg-slate-900/70 p-4"
                         key={category}
+                        whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                        transition={{ duration: 0.18 }}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs font-medium text-slate-200">
                             {category}
                           </span>
-                          <span
+                          <motion.span
+                            animate={{ opacity: 1 }}
                             className={`text-xs font-semibold ${progressTextColor}`}
+                            initial={shouldReduceMotion ? false : { opacity: 0.55 }}
+                            key={`${category}-${progress.toFixed(0)}`}
+                            transition={{ duration: 0.2 }}
                           >
                             {progress.toFixed(0)}%
-                          </span>
+                          </motion.span>
                         </div>
                         <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
                           <span>Gastado {formatCurrency(spent)}</span>
                           <span>Límite {formatCurrency(limit)}</span>
                         </div>
                         <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
-                          <div
+                          <motion.div
+                            animate={{ width: `${Math.min(progress, 100)}%` }}
                             className={`h-full rounded-full transition-all ${progressColor}`}
-                            style={{ width: `${Math.min(progress, 100)}%` }}
+                            initial={false}
+                            transition={{ duration: 0.35, ease: "easeOut" }}
                           />
                         </div>
                         <label className="mt-3 block">
@@ -817,14 +984,17 @@ export default function Home() {
                             value={limit}
                           />
                         </label>
-                      </div>
+                      </motion.div>
                     );
                   },
                 )}
               </div>
             </article>
 
-            <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-slate-800 pt-5 text-center sm:flex-row sm:text-left">
+            <motion.div
+              className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-slate-800 pt-5 text-center sm:flex-row sm:text-left"
+              whileHover={shouldReduceMotion ? undefined : { scale: 1.005 }}
+            >
               <p className="text-sm text-slate-400">
                 ¿Quieres usarlo con tus cartolas reales?
               </p>
@@ -846,18 +1016,28 @@ export default function Home() {
                   <path d="M5 12h14m-6-6 6 6-6 6" />
                 </svg>
               </Link>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
-      </section>
+      </motion.section>
 
-      <section
+      <motion.section
         aria-labelledby="features-title"
         className="relative border-y border-slate-800/80 bg-slate-900/30"
         id="caracteristicas"
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 28 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.12 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
       >
         <div className="mx-auto w-full max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:py-24">
-          <div className="mx-auto mb-11 max-w-2xl text-center sm:mb-14">
+          <motion.div
+            className="mx-auto mb-11 max-w-2xl text-center sm:mb-14"
+            initial={shouldReduceMotion ? false : { opacity: 0, y: 18 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
             <p className="text-sm font-medium text-emerald-400">
               Finanzas más simples
             </p>
@@ -871,13 +1051,19 @@ export default function Home() {
               Menos tiempo ordenando datos. Más claridad para entender cómo se
               mueve tu dinero.
             </p>
-          </div>
+          </motion.div>
 
           <div className="grid gap-4 md:grid-cols-3">
-            {features.map((feature) => (
-              <article
+            {features.map((feature, index) => (
+              <motion.article
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 22 }}
                 className="rounded-2xl border border-slate-800 bg-slate-950/80 p-6 transition hover:border-emerald-500/30 sm:p-7"
                 key={feature.number}
+                whileInView={{ opacity: 1, y: 0 }}
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+                viewport={{ once: true, amount: 0.2 }}
+                transition={{ delay: index * 0.12, duration: 0.45 }}
               >
                 <div className="flex items-center justify-between">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-400">
@@ -904,11 +1090,11 @@ export default function Home() {
                 <p className="mt-3 text-sm leading-6 text-slate-400">
                   {feature.description}
                 </p>
-              </article>
+              </motion.article>
             ))}
           </div>
         </div>
-      </section>
+      </motion.section>
 
       <footer className="relative">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-5 py-7 sm:flex-row sm:items-center sm:justify-between sm:px-8">
