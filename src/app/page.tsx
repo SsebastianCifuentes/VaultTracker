@@ -94,11 +94,15 @@ const filters: CategoryFilter[] = [
 ];
 
 const banks = [
-  { name: "Santander", domain: "santander.cl" },
+  { name: "Santander", domain: "www.santander.cl", initial: "S" },
   { name: "Banco de Chile", domain: "bancochile.cl" },
-  { name: "BancoEstado", domain: "bancoestado.cl" },
-  { name: "Bci", domain: "bci.cl" },
-  { name: "Scotiabank", domain: "scotiabankchile.cl" },
+  { name: "BancoEstado", domain: "www.bancoestado.cl", initial: "BE" },
+  { name: "Bci", domain: "www.bci.cl", initial: "B" },
+  {
+    name: "Scotiabank",
+    domain: "www.scotiabankchile.cl",
+    initial: "S",
+  },
   { name: "Falabella", domain: "bancofalabella.cl" },
 ];
 
@@ -327,6 +331,7 @@ export default function Home() {
                 <SmartLogo
                   domain={bank.domain}
                   name={bank.name}
+                  initial={bank.initial}
                   className="h-10 w-10 rounded-full border border-slate-200"
                 />
                 <div>
