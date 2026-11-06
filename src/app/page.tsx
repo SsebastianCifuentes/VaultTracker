@@ -1,4 +1,103 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo, useState } from "react";
+import {
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
+
+type DemoCategory =
+  | "Viajes"
+  | "Ocio"
+  | "Supermercado"
+  | "Restaurantes"
+  | "Transporte"
+  | "Vivienda/Gastos Comunes"
+  | "Pagos";
+
+interface DemoTransaction {
+  id: number;
+  date: string;
+  description: string;
+  amount: number;
+  type: "INCOME" | "EXPENSE";
+  category: DemoCategory;
+}
+
+const demoCategories: DemoCategory[] = [
+  "Viajes",
+  "Ocio",
+  "Supermercado",
+  "Restaurantes",
+  "Transporte",
+  "Vivienda/Gastos Comunes",
+  "Pagos",
+];
+
+const demoColors: Record<DemoCategory, string> = {
+  Viajes: "#2dd4bf",
+  Ocio: "#a78bfa",
+  Supermercado: "#34d399",
+  Restaurantes: "#fb7185",
+  Transporte: "#22d3ee",
+  "Vivienda/Gastos Comunes": "#f97316",
+  Pagos: "#818cf8",
+};
+
+const initialDemoTransactions: DemoTransaction[] = [
+  {
+    id: 1,
+    date: "06 nov",
+    description: "Air Canada · pasaje",
+    amount: 248900,
+    type: "EXPENSE",
+    category: "Viajes",
+  },
+  {
+    id: 2,
+    date: "05 nov",
+    description: "Uber · viaje a casa",
+    amount: 8900,
+    type: "EXPENSE",
+    category: "Transporte",
+  },
+  {
+    id: 3,
+    date: "04 nov",
+    description: "Jumbo · compra semanal",
+    amount: 58450,
+    type: "EXPENSE",
+    category: "Supermercado",
+  },
+  {
+    id: 4,
+    date: "03 nov",
+    description: "Copec · combustible",
+    amount: 42000,
+    type: "EXPENSE",
+    category: "Transporte",
+  },
+  {
+    id: 5,
+    date: "02 nov",
+    description: "Uber Eats · almuerzo",
+    amount: 18400,
+    type: "EXPENSE",
+    category: "Restaurantes",
+  },
+  {
+    id: 6,
+    date: "01 nov",
+    description: "Abono de sueldo",
+    amount: 1250000,
+    type: "INCOME",
+    category: "Pagos",
+  },
+];
 
 const features = [
   {
@@ -63,6 +162,71 @@ function BrandMark({ small = false }: { small?: boolean }) {
 }
 
 export default function Home() {
+  const [transactions, setTransactions] = useState(initialDemoTransactions);
+  const [selectedCategory, setSelectedCategory] = useState<
+    "Todas" | DemoCategory
+  >("Todas");
+  const [budgetLimits, setBudgetLimits] = useState({
+    Ocio: 80000,
+    Restaurantes: 120000,
+    Supermercado: 220000,
+  });
+
+  const filteredTransactions = useMemo(
+    () =>
+      selectedCategory === "Todas"
+        ? transactions
+        : transactions.filter(
+            (transaction) => transaction.category === selectedCategory,
+          ),
+    [selectedCategory, transactions],
+  );
+  const expenseDistribution = useMemo(
+    () =>
+      demoCategories
+        .filter((category) => category !== "Pagos")
+        .map((category) => ({
+          category,
+          amount: transactions
+            .filter(
+              (transaction) =>
+                transaction.type === "EXPENSE" &&
+                transaction.category === category,
+            )
+            .reduce((total, transaction) => total + transaction.amount, 0),
+        }))
+        .filter((entry) => entry.amount > 0),
+    [transactions],
+  );
+  const totalExpenses = filteredTransactions
+    .filter((transaction) => transaction.type === "EXPENSE")
+    .reduce((total, transaction) => total + transaction.amount, 0);
+  const totalIncome = filteredTransactions
+    .filter((transaction) => transaction.type === "INCOME")
+    .reduce((total, transaction) => total + transaction.amount, 0);
+  const netBalance = totalIncome - totalExpenses;
+  const budgetSpending = transactions
+    .filter(
+      (transaction) =>
+        transaction.type === "EXPENSE" &&
+        (transaction.category === "Ocio" ||
+          transaction.category === "Restaurantes" ||
+          transaction.category === "Supermercado"),
+    )
+    .reduce<Record<string, number>>((totals, transaction) => {
+      totals[transaction.category] =
+        (totals[transaction.category] ?? 0) + transaction.amount;
+      return totals;
+    }, {});
+
+  function formatCurrency(amount: number) {
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency: "CLP",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
       <div
@@ -128,6 +292,24 @@ export default function Home() {
                 <path d="M5 12h14m-6-6 6 6-6 6" />
               </svg>
             </Link>
+            <a
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-400/[0.07] px-5 py-3.5 text-sm font-semibold text-emerald-200 transition hover:border-emerald-300/60 hover:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+              href="#demo-interactivo"
+            >
+              Explorar resumen interactivo
+              <svg
+                aria-hidden="true"
+                className="h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 5v14m-7-7 7 7 7-7" />
+              </svg>
+            </a>
             <a
               className="inline-flex items-center justify-center rounded-lg border border-slate-700 px-5 py-3.5 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
               href="#caracteristicas"
@@ -270,6 +452,400 @@ export default function Home() {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="interactive-demo-title"
+        className="relative border-y border-slate-800/80 bg-slate-900/35"
+        id="demo-interactivo"
+      >
+        <div className="mx-auto w-full max-w-7xl px-5 py-16 sm:px-8 sm:py-20 lg:py-24">
+          <div className="mx-auto mb-10 max-w-3xl text-center">
+            <p className="text-sm font-medium text-emerald-400">
+              Explora con datos de ejemplo
+            </p>
+            <h2
+              className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl"
+              id="interactive-demo-title"
+            >
+              Prueba el potencial de VaultTracker
+            </h2>
+            <p className="mt-4 text-sm leading-6 text-slate-400 sm:text-base">
+              Filtra movimientos, cambia categorías y ajusta tus límites. Todo
+              lo que ves es interactivo y ocurre en esta página.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-2xl shadow-black/20 sm:p-7 lg:p-8">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-white">
+                  Resumen de noviembre
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Datos ficticios · prueba los controles para explorar
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-xs text-slate-400">
+                Categoría
+                <select
+                  className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                  onChange={(event) =>
+                    setSelectedCategory(
+                      event.target.value === "Todas"
+                        ? "Todas"
+                        : (event.target.value as DemoCategory),
+                    )
+                  }
+                  value={selectedCategory}
+                >
+                  <option value="Todas">Todas</option>
+                  {demoCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mb-5 grid gap-3 sm:grid-cols-3">
+              <article className="rounded-xl border border-rose-500/15 bg-rose-500/[0.04] p-4">
+                <p className="text-xs font-medium text-rose-300">
+                  Total Gastos
+                </p>
+                <p className="mt-2 text-xl font-semibold text-white">
+                  {formatCurrency(totalExpenses)}
+                </p>
+              </article>
+              <article className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] p-4">
+                <p className="text-xs font-medium text-emerald-300">
+                  Total Pagos
+                </p>
+                <p className="mt-2 text-xl font-semibold text-white">
+                  {formatCurrency(totalIncome)}
+                </p>
+              </article>
+              <article className="rounded-xl border border-slate-700 bg-slate-950/60 p-4">
+                <p className="text-xs font-medium text-slate-400">
+                  Balance Neto
+                </p>
+                <p
+                  className={`mt-2 text-xl font-semibold ${
+                    netBalance < 0 ? "text-rose-300" : "text-white"
+                  }`}
+                >
+                  {formatCurrency(netBalance)}
+                </p>
+              </article>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+              <article className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">
+                    Distribución de gastos
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Selecciona un segmento para filtrar los movimientos
+                  </p>
+                </div>
+                <div className="mt-2 grid items-center gap-3 sm:grid-cols-[minmax(0,1.1fr)_minmax(8rem,0.9fr)]">
+                  <div className="h-56 min-w-0">
+                    <ResponsiveContainer height="100%" width="100%">
+                      <PieChart>
+                        <Pie
+                          data={expenseDistribution}
+                          dataKey="amount"
+                          innerRadius="57%"
+                          nameKey="category"
+                          outerRadius="84%"
+                          paddingAngle={3}
+                          stroke="none"
+                        >
+                          {expenseDistribution.map((entry) => (
+                            <Cell
+                              fill={demoColors[entry.category]}
+                              fillOpacity={
+                                selectedCategory === "Todas" ||
+                                selectedCategory === entry.category
+                                  ? 1
+                                  : 0.35
+                              }
+                              key={entry.category}
+                              onClick={() =>
+                                setSelectedCategory((currentCategory) =>
+                                  currentCategory === entry.category
+                                    ? "Todas"
+                                    : entry.category,
+                                )
+                              }
+                              style={{ cursor: "pointer" }}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#0f172a",
+                            border: "1px solid #334155",
+                            borderRadius: "0.75rem",
+                            color: "#e2e8f0",
+                          }}
+                          formatter={(value, name) => [
+                            formatCurrency(Number(value)),
+                            String(name),
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="space-y-2.5">
+                    {expenseDistribution.map((entry) => {
+                      const allExpenses = expenseDistribution.reduce(
+                        (total, category) => total + category.amount,
+                        0,
+                      );
+                      return (
+                        <li key={entry.category}>
+                          <button
+                            aria-pressed={selectedCategory === entry.category}
+                            className="flex w-full items-center justify-between gap-2 text-left text-xs"
+                            onClick={() =>
+                              setSelectedCategory((currentCategory) =>
+                                currentCategory === entry.category
+                                  ? "Todas"
+                                  : entry.category,
+                              )
+                            }
+                            type="button"
+                          >
+                            <span className="flex min-w-0 items-center gap-2 text-slate-300">
+                              <span
+                                aria-hidden="true"
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{
+                                  backgroundColor: demoColors[entry.category],
+                                }}
+                              />
+                              <span className="truncate">{entry.category}</span>
+                            </span>
+                            <span className="shrink-0 text-slate-500">
+                              {((entry.amount / allExpenses) * 100).toFixed(0)}%
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </article>
+
+              <article className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5">
+                <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">
+                      Movimientos recientes
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Cambia la categoría de una fila para actualizar el gráfico
+                    </p>
+                  </div>
+                  <span className="text-xs text-slate-500">
+                    {filteredTransactions.length} movimientos
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border border-slate-800">
+                  <table className="min-w-full divide-y divide-slate-800 text-left text-xs">
+                    <thead className="bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500">
+                      <tr>
+                        <th className="px-3 py-3 font-medium" scope="col">
+                          Fecha
+                        </th>
+                        <th className="px-3 py-3 font-medium" scope="col">
+                          Descripción
+                        </th>
+                        <th className="px-3 py-3 font-medium" scope="col">
+                          Categoría
+                        </th>
+                        <th
+                          className="whitespace-nowrap px-3 py-3 text-right font-medium"
+                          scope="col"
+                        >
+                          Monto
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/80">
+                      {filteredTransactions.map((transaction) => (
+                        <tr className="text-slate-300" key={transaction.id}>
+                          <td className="whitespace-nowrap px-3 py-3 text-slate-500">
+                            {transaction.date}
+                          </td>
+                          <td className="min-w-36 px-3 py-3">
+                            <span className="block truncate">
+                              {transaction.description}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2">
+                            <select
+                              aria-label={`Categoría de ${transaction.description}`}
+                              className="max-w-40 rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] text-slate-200 outline-none focus:border-emerald-500"
+                              onChange={(event) => {
+                                const category =
+                                  demoCategories.find(
+                                    (option) => option === event.target.value,
+                                  ) ?? "Ocio";
+                                setTransactions((currentTransactions) =>
+                                  currentTransactions.map((currentTransaction) =>
+                                    currentTransaction.id === transaction.id
+                                      ? { ...currentTransaction, category }
+                                      : currentTransaction,
+                                  ),
+                                );
+                              }}
+                              value={transaction.category}
+                            >
+                              {demoCategories.map((category) => (
+                                <option key={category} value={category}>
+                                  {category}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td
+                            className={`whitespace-nowrap px-3 py-3 text-right font-medium ${
+                              transaction.type === "INCOME"
+                                ? "text-emerald-300"
+                                : "text-slate-200"
+                            }`}
+                          >
+                            {transaction.type === "INCOME" ? "+" : "−"}
+                            {formatCurrency(transaction.amount)}
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredTransactions.length === 0 && (
+                        <tr>
+                          <td
+                            className="px-3 py-8 text-center text-slate-500"
+                            colSpan={4}
+                          >
+                            No hay movimientos en esta categoría.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+
+            <article className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5">
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-white">
+                  Metas de presupuesto
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Ajusta los límites y observa cómo cambia tu progreso
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                {(["Ocio", "Restaurantes", "Supermercado"] as const).map(
+                  (category) => {
+                    const spent = budgetSpending[category] ?? 0;
+                    const limit = budgetLimits[category];
+                    const progress = limit > 0 ? (spent / limit) * 100 : 0;
+                    const progressColor =
+                      progress < 75
+                        ? "bg-emerald-400"
+                        : progress <= 95
+                          ? "bg-amber-400"
+                          : "bg-rose-400";
+                    const progressTextColor =
+                      progress < 75
+                        ? "text-emerald-300"
+                        : progress <= 95
+                          ? "text-amber-300"
+                          : "text-rose-300";
+
+                    return (
+                      <div
+                        className="rounded-lg border border-slate-800 bg-slate-900/70 p-4"
+                        key={category}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-slate-200">
+                            {category}
+                          </span>
+                          <span
+                            className={`text-xs font-semibold ${progressTextColor}`}
+                          >
+                            {progress.toFixed(0)}%
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
+                          <span>Gastado {formatCurrency(spent)}</span>
+                          <span>Límite {formatCurrency(limit)}</span>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+                          <div
+                            className={`h-full rounded-full transition-all ${progressColor}`}
+                            style={{ width: `${Math.min(progress, 100)}%` }}
+                          />
+                        </div>
+                        <label className="mt-3 block">
+                          <span className="sr-only">
+                            Ajustar límite de {category}
+                          </span>
+                          <input
+                            aria-label={`Límite mensual de ${category}`}
+                            className="h-1.5 w-full cursor-pointer accent-emerald-400"
+                            max="400000"
+                            min="20000"
+                            onChange={(event) =>
+                              setBudgetLimits((currentLimits) => ({
+                                ...currentLimits,
+                                [category]: Number(event.target.value),
+                              }))
+                            }
+                            step="5000"
+                            type="range"
+                            value={limit}
+                          />
+                        </label>
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            </article>
+
+            <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-slate-800 pt-5 text-center sm:flex-row sm:text-left">
+              <p className="text-sm text-slate-400">
+                ¿Quieres usarlo con tus cartolas reales?
+              </p>
+              <Link
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+                href="/login"
+              >
+                Crear cuenta / Iniciar sesión
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.8"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M5 12h14m-6-6 6 6-6 6" />
+                </svg>
+              </Link>
             </div>
           </div>
         </div>

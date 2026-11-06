@@ -1,6 +1,7 @@
 "use client";
 
 import { createBrowserClient } from "@supabase/ssr";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -53,6 +54,119 @@ function getLocalDateString() {
 
 function getLocalMonthString() {
   return getLocalDateString().slice(0, 7);
+}
+
+function createDemoTransactions(): SavedTransaction[] {
+  const examples: Array<
+    Pick<TransactionItem, "description" | "amount" | "type" | "category">
+  > = [
+    {
+      description: "Uber Eats - Sushi House",
+      amount: 24990,
+      type: "EXPENSE",
+      category: "Restaurantes",
+    },
+    {
+      description: "Coffee House Providencia",
+      amount: 7900,
+      type: "EXPENSE",
+      category: "Restaurantes",
+    },
+    {
+      description: "Jumbo - compra semanal",
+      amount: 45680,
+      type: "EXPENSE",
+      category: "Supermercado",
+    },
+    {
+      description: "Uber viaje a casa",
+      amount: 8500,
+      type: "EXPENSE",
+      category: "Transporte",
+    },
+    {
+      description: "Air Canada - pasaje",
+      amount: 258000,
+      type: "EXPENSE",
+      category: "Viajes",
+    },
+    {
+      description: "ENEL cuenta de luz",
+      amount: 36800,
+      type: "EXPENSE",
+      category: "Vivienda/Gastos Comunes",
+    },
+    {
+      description: "Copec combustible",
+      amount: 42000,
+      type: "EXPENSE",
+      category: "Transporte",
+    },
+    {
+      description: "Steam juegos",
+      amount: 11990,
+      type: "EXPENSE",
+      category: "Ocio",
+    },
+    {
+      description: "Farmacia Cruz Verde",
+      amount: 15200,
+      type: "EXPENSE",
+      category: "Salud",
+    },
+    {
+      description: "Arriendo departamento",
+      amount: 420000,
+      type: "EXPENSE",
+      category: "Vivienda/Gastos Comunes",
+    },
+    {
+      description: "Abono sueldo mensual",
+      amount: 1250000,
+      type: "INCOME",
+      category: "Pagos",
+    },
+    {
+      description: "Traspaso recibido",
+      amount: 85000,
+      type: "INCOME",
+      category: "Pagos",
+    },
+  ];
+  const today = new Date();
+
+  return Array.from({ length: 36 }, (_, index) => {
+    const example = examples[index % examples.length];
+    const monthOffset = Math.floor(index / examples.length);
+    const date = new Date(
+      today.getFullYear(),
+      today.getMonth() - monthOffset,
+      3 + ((index * 5) % 25),
+    );
+    const dateString = [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    return {
+      ...example,
+      id: `demo-${index + 1}`,
+      date: dateString,
+      description: `${example.description} #${index + 1}`,
+      amount: example.amount + monthOffset * (index % 2 === 0 ? 1250 : 2100),
+    };
+  });
+}
+
+function createDemoBudgets(): BudgetRecord[] {
+  return [
+    { category: "Ocio", monthly_limit: 80000 },
+    { category: "Restaurantes", monthly_limit: 150000 },
+    { category: "Supermercado", monthly_limit: 250000 },
+    { category: "Transporte", monthly_limit: 120000 },
+    { category: "Viajes", monthly_limit: 300000 },
+  ];
 }
 
 function HistorySkeletons() {
@@ -318,6 +432,7 @@ function SavedExpenseInsights({
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -376,6 +491,7 @@ export default function DashboardPage() {
   >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const demoManualIdRef = useRef(0);
 
   useEffect(
     () => () => {
@@ -447,6 +563,29 @@ export default function DashboardPage() {
     let active = true;
 
     async function checkSession() {
+      if (
+        new URLSearchParams(window.location.search).get("demo") === "1"
+      ) {
+        const demoBudgets = createDemoBudgets();
+        setIsDemoMode(true);
+        setUserEmail("exploracion@vaulttracker.demo");
+        setSelectedMonth(getLocalMonthString());
+        setSavedTransactions(createDemoTransactions());
+        setBudgets(demoBudgets);
+        setBudgetDrafts(
+          Object.fromEntries(
+            demoBudgets.map((budget) => [
+              budget.category,
+              String(budget.monthly_limit),
+            ]),
+          ),
+        );
+        setIsLoadingHistory(false);
+        setIsLoadingBudgets(false);
+        setLoading(false);
+        return;
+      }
+
       if (!supabase) {
         setErrorMsg("Falta configurar la conexión con Supabase.");
         setLoading(false);
@@ -605,6 +744,18 @@ export default function DashboardPage() {
   ) {
     if (category === transaction.category) return;
 
+    if (isDemoMode) {
+      setSavedTransactions((currentTransactions) =>
+        currentTransactions.map((savedTransaction) =>
+          savedTransaction.id === transaction.id
+            ? { ...savedTransaction, category }
+            : savedTransaction,
+        ),
+      );
+      showManagementNotice("Categoría demo actualizada.");
+      return;
+    }
+
     if (!supabase || !userId || transaction.id === undefined) {
       setCategoryError(
         "No se pudo actualizar la categoría de este movimiento.",
@@ -665,6 +816,14 @@ export default function DashboardPage() {
   }
 
   async function handleClearSandboxData() {
+    if (isDemoMode) {
+      setSavedTransactions([]);
+      setHistoryPage(1);
+      setIsSandboxConfirmOpen(false);
+      showManagementNotice("Datos demo reiniciados.");
+      return;
+    }
+
     if (!supabase || !userId) {
       setManagementError(
         "No se pudo verificar tu sesión para borrar los datos de prueba.",
@@ -704,6 +863,23 @@ export default function DashboardPage() {
   }
 
   async function handleSaveBudget(category: string) {
+    if (isDemoMode) {
+      const monthlyLimit = Number(budgetDrafts[category]);
+      if (!Number.isFinite(monthlyLimit) || monthlyLimit <= 0) {
+        setBudgetError("Ingresa un límite mensual mayor que cero.");
+        return;
+      }
+
+      const budget = { category, monthly_limit: monthlyLimit };
+      setBudgets((currentBudgets) => [
+        ...currentBudgets.filter((item) => item.category !== category),
+        budget,
+      ]);
+      setBudgetError("");
+      showManagementNotice("Presupuesto demo actualizado.");
+      return;
+    }
+
     if (!supabase || !userId) {
       setBudgetError(
         "No se pudo verificar tu sesión para guardar el presupuesto.",
@@ -763,7 +939,7 @@ export default function DashboardPage() {
   }
 
   async function handleDeleteTransaction(transaction: SavedTransaction) {
-    if (!supabase || !userId || transaction.id === undefined) {
+    if (!isDemoMode && (!supabase || !userId || transaction.id === undefined)) {
       setManagementError(
         "No se pudo eliminar este movimiento: faltan datos de la sesión.",
       );
@@ -775,8 +951,21 @@ export default function DashboardPage() {
     );
     if (!confirmed) return;
 
-    setDeletingTransactionId(transaction.id);
+    setDeletingTransactionId(transaction.id ?? null);
     setManagementError("");
+
+    if (isDemoMode) {
+      setSavedTransactions((currentTransactions) =>
+        currentTransactions.filter(
+          (savedTransaction) => savedTransaction.id !== transaction.id,
+        ),
+      );
+      showManagementNotice("Movimiento demo eliminado.");
+      setDeletingTransactionId(null);
+      return;
+    }
+
+    if (!supabase || !userId || transaction.id === undefined) return;
 
     try {
       const { error } = await supabase
@@ -816,7 +1005,7 @@ export default function DashboardPage() {
   ) {
     event.preventDefault();
 
-    if (!supabase || !userId) {
+    if (!isDemoMode && (!supabase || !userId)) {
       setManualFormError(
         "No se pudo verificar tu sesión. Inicia sesión nuevamente.",
       );
@@ -829,12 +1018,45 @@ export default function DashboardPage() {
       return;
     }
 
+    if (isDemoMode) {
+      const transaction: SavedTransaction = {
+        ...manualTransaction,
+        id: `demo-manual-${++demoManualIdRef.current}`,
+        description: manualTransaction.description.trim(),
+        amount,
+      };
+      setSavedTransactions((currentTransactions) =>
+        [transaction, ...currentTransactions].sort((left, right) =>
+          right.date.localeCompare(left.date),
+        ),
+      );
+      setIsManualFormOpen(false);
+      setManualTransaction({
+        date: "",
+        description: "",
+        amount: "",
+        type: "EXPENSE",
+        category: "Otros",
+      });
+      showManagementNotice("Movimiento agregado solo a la sesión demo.");
+      return;
+    }
+
+    if (!supabase || !userId) {
+      setManualFormError(
+        "No se pudo verificar tu sesión. Inicia sesión nuevamente.",
+      );
+      return;
+    }
+
+    const currentSupabase = supabase;
+    const currentUserId = userId;
     setIsSavingManual(true);
     setManualFormError("");
     setManagementError("");
 
     try {
-      const { data: insertedTransaction, error } = await supabase
+      const { data: insertedTransaction, error } = await currentSupabase
         .from("transactions")
         .insert({
           date: manualTransaction.date,
@@ -842,7 +1064,7 @@ export default function DashboardPage() {
           amount,
           type: manualTransaction.type,
           category: manualTransaction.category,
-          user_id: userId,
+          user_id: currentUserId,
         })
         .select("*")
         .single();
@@ -873,7 +1095,7 @@ export default function DashboardPage() {
         ),
       );
       try {
-        const transactions = await fetchSavedTransactions(userId);
+        const transactions = await fetchSavedTransactions(currentUserId);
         setSavedTransactions(transactions);
         setHistoryError("");
       } catch (error) {
@@ -913,6 +1135,14 @@ export default function DashboardPage() {
   }
 
   async function handleSaveToDatabase() {
+    if (isDemoMode) {
+      setSaveMessage({
+        type: "error",
+        text: "Los movimientos no se guardan permanentemente en el modo demo.",
+      });
+      return;
+    }
+
     if (!supabase) {
       setSaveMessage({
         type: "error",
@@ -1300,24 +1530,50 @@ export default function DashboardPage() {
 
           <div className="flex items-center gap-3 sm:gap-5">
             <span className="hidden text-sm text-slate-400 sm:inline">
-              {userEmail}
+              {isDemoMode ? "Modo exploración" : userEmail}
             </span>
-            <button
-              className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-300 transition hover:border-emerald-500/50 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loggingOut}
-              onClick={() => void handleLogout()}
-              type="button"
-            >
-              {loggingOut ? "Cerrando..." : "Cerrar sesión"}
-            </button>
+            {isDemoMode ? (
+              <Link
+                className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-300 transition hover:border-emerald-500/50 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                href="/"
+              >
+                Salir de demo
+              </Link>
+            ) : (
+              <button
+                className="rounded-lg border border-slate-700 px-3 py-2 text-sm font-medium text-slate-300 transition hover:border-emerald-500/50 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={loggingOut}
+                onClick={() => void handleLogout()}
+                type="button"
+              >
+                {loggingOut ? "Cerrando..." : "Cerrar sesión"}
+              </button>
+            )}
           </div>
         </nav>
         <p className="px-4 pb-3 text-right text-xs text-slate-400 sm:hidden">
-          {userEmail}
+          {isDemoMode ? "Modo exploración" : userEmail}
         </p>
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+        {isDemoMode && (
+          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-emerald-100/90">
+              <span className="font-semibold text-emerald-300">
+                Estás en el Modo Demo Interactivo.
+              </span>{" "}
+              Los cambios no se guardarán permanentemente.
+            </p>
+            <Link
+              className="shrink-0 text-sm font-semibold text-emerald-300 underline decoration-emerald-500/40 underline-offset-4 transition hover:text-emerald-200"
+              href="/login"
+            >
+              Crear cuenta real
+            </Link>
+          </div>
+        )}
+
         {managementNotice && (
           <div
             aria-live="polite"
