@@ -2,9 +2,10 @@
 
 import { createBrowserClient } from "@supabase/ssr";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Cell,
   Pie,
@@ -12,6 +13,19 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  CalendarClock,
+  ChartNoAxesCombined,
+  ChevronDown,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  UsersRound,
+  X,
+} from "lucide-react";
+import SmartLogo from "@/components/SmartLogo";
 import {
   assignAutoCategory,
   parseBankCSV,
@@ -62,7 +76,6 @@ function getMerchantDomain(description: string) {
 }
 
 function MerchantLogo({ description }: { description: string }) {
-  const [hasError, setHasError] = useState(false);
   const domain = getMerchantDomain(description);
   const merchantName =
     description
@@ -71,20 +84,16 @@ function MerchantLogo({ description }: { description: string }) {
       .replace(/\s+/g, " ") || description.trim();
   const initial = merchantName.charAt(0).toLocaleUpperCase("es") || "?";
 
-  return (
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-100 bg-emerald-50 text-sm font-semibold text-emerald-700">
-      {domain && !hasError ? (
-        // Clearbit domains are resolved dynamically, so use a plain image with a local fallback.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          alt=""
-          className="h-full w-full rounded-full object-cover"
-          onError={() => setHasError(true)}
-          src={`https://logo.clearbit.com/${domain}`}
-        />
-      ) : (
-        initial
-      )}
+  return domain ? (
+    <SmartLogo
+      domain={domain}
+      name={merchantName}
+      initial={initial}
+      className="h-10 w-10 shrink-0 rounded-full border border-slate-100"
+    />
+  ) : (
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-emerald-100 bg-emerald-50 text-sm font-semibold text-emerald-700">
+      {initial}
     </span>
   );
 }
@@ -286,6 +295,27 @@ function isTransactionCategory(
   );
 }
 
+function VaultTrackerMark() {
+  return (
+    <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 shadow-md shadow-emerald-700/15">
+      <svg
+        aria-hidden="true"
+        className="h-8 w-8"
+        fill="none"
+        stroke="white"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2.6"
+        viewBox="0 0 64 64"
+      >
+        <path d="M32 10C21 10 16 16 16 27v11c0 10 16 17 16 17s16-7 16-17V27C48 16 43 10 32 10Z" />
+        <path d="m23 35 7-7 5 5 8-10" />
+        <path d="M38 23h5v5" />
+      </svg>
+    </span>
+  );
+}
+
 function CategorySpendingBreakdown({
   transactions,
   formatCurrency,
@@ -484,6 +514,10 @@ function SavedExpenseInsights({
 
 export default function DashboardPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const activeSection =
+    pathname === "/dashboard" ? "overview" : pathname.split("/")[2];
+  const reduceMotion = useReducedMotion();
   const [isDemoMode, setIsDemoMode] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -516,8 +550,11 @@ export default function DashboardPage() {
   >(null);
   const [managementError, setManagementError] = useState("");
   const [managementNotice, setManagementNotice] = useState("");
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [assistantQuestion, setAssistantQuestion] = useState("");
+  const [assistantReply, setAssistantReply] = useState("");
   const [isSandboxConfirmOpen, setIsSandboxConfirmOpen] = useState(false);
-  const [isClearingSandbox, setIsClearingSandbox] = useState(false);
+  const isClearingSandbox = false;
   const [isManualFormOpen, setIsManualFormOpen] = useState(false);
   const [isSavingManual, setIsSavingManual] = useState(false);
   const [manualFormError, setManualFormError] = useState("");
@@ -868,50 +905,12 @@ export default function DashboardPage() {
   }
 
   async function handleClearSandboxData() {
-    if (isDemoMode) {
-      setSavedTransactions([]);
-      setHistoryPage(1);
-      setIsSandboxConfirmOpen(false);
-      showManagementNotice("Datos demo reiniciados.");
-      return;
-    }
+    if (!isDemoMode) return;
 
-    if (!supabase || !userId) {
-      setManagementError(
-        "No se pudo verificar tu sesión para borrar los datos de prueba.",
-      );
-      return;
-    }
-
-    setIsClearingSandbox(true);
-    setManagementError("");
-
-    try {
-      const { error } = await supabase
-        .from("transactions")
-        .delete()
-        .eq("user_id", userId);
-
-      if (error) {
-        setManagementError(
-          `No se pudieron borrar los datos de prueba: ${error.message}`,
-        );
-        return;
-      }
-
-      setSavedTransactions([]);
-      setHistoryPage(1);
-      setIsSandboxConfirmOpen(false);
-      showManagementNotice("Datos de prueba borrados correctamente.");
-    } catch (error) {
-      setManagementError(
-        error instanceof Error
-          ? `No se pudieron borrar los datos de prueba: ${error.message}`
-          : "Ocurrió un error inesperado al borrar los datos de prueba.",
-      );
-    } finally {
-      setIsClearingSandbox(false);
-    }
+    setSavedTransactions([]);
+    setHistoryPage(1);
+    setIsSandboxConfirmOpen(false);
+    showManagementNotice("Datos demo reiniciados.");
   }
 
   async function handleSaveBudget(category: string) {
@@ -1462,6 +1461,16 @@ export default function DashboardPage() {
       : savedTransactions.filter(
           (transaction) => transaction.date.slice(0, 7) === selectedMonth,
         );
+  const periodExpenses = selectedPeriodTransactions
+    .filter((transaction) => transaction.type === "EXPENSE")
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
+  const periodIncome = selectedPeriodTransactions
+    .filter((transaction) => transaction.type === "INCOME")
+    .reduce((total, transaction) => total + Number(transaction.amount), 0);
+  const monthlyBudgetTotal = budgets.reduce(
+    (total, budget) => total + Number(budget.monthly_limit),
+    0,
+  );
   const monthlySpending = selectedPeriodTransactions
     .filter((transaction) => transaction.type === "EXPENSE")
     .reduce<Record<string, number>>((totals, transaction) => {
@@ -1469,6 +1478,11 @@ export default function DashboardPage() {
         (totals[transaction.category] ?? 0) + Number(transaction.amount);
       return totals;
     }, {});
+  const budgetTrackedSpending = budgets.reduce(
+    (total, budget) => total + (monthlySpending[budget.category] ?? 0),
+    0,
+  );
+  const budgetRemaining = Math.max(0, monthlyBudgetTotal - budgetTrackedSpending);
   const filteredTransactions = savedTransactions.filter((transaction) => {
     const matchesCategory =
       selectedCategory === "Todas" ||
@@ -1563,22 +1577,7 @@ export default function DashboardPage() {
             className="flex items-center gap-3 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-500"
             href="/"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-600">
-              <svg
-                aria-hidden="true"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 10.5h14v9H5zM8 10.5V7a4 4 0 0 1 8 0v3.5m-4 4v1.5"
-                />
-              </svg>
-            </div>
+            <VaultTrackerMark />
             <span className="text-sm font-semibold tracking-[0.16em] text-slate-800">
               VAULTTRACKER
             </span>
@@ -1587,6 +1586,12 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 sm:gap-5">
             <span className="hidden text-sm text-slate-600 sm:inline">
               {isDemoMode ? "Modo exploración" : userEmail}
+            </span>
+            <span
+              aria-hidden="true"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-800"
+            >
+              {(userEmail?.[0] ?? "V").toLocaleUpperCase("es")}
             </span>
             {isDemoMode ? (
               <Link
@@ -1613,6 +1618,36 @@ export default function DashboardPage() {
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+        <nav
+          aria-label="Secciones del dashboard"
+          className="-mx-4 mb-7 flex gap-2 overflow-x-auto border-b border-slate-200 px-4 pb-3 sm:mx-0 sm:px-0"
+        >
+          {[
+            { label: "Resumen", section: "overview" },
+            { label: "Subir cartola", section: "upload" },
+            { label: "Presupuestos", section: "budgets" },
+            { label: "Historial", section: "history" },
+          ].map((item) => {
+            const href = `/dashboard${item.section === "overview" ? "" : `/${item.section}`}${isDemoMode ? "?demo=1" : ""}`;
+            const isActive = item.section === activeSection;
+
+            return (
+              <Link
+                aria-current={isActive ? "page" : undefined}
+                className={`shrink-0 rounded-full border px-4 py-2 text-xs font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 ${
+                  isActive
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800"
+                }`}
+                href={href}
+                key={item.label}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
         {isDemoMode && (
           <div className="mb-6 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-emerald-800">
@@ -1654,14 +1689,30 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-7 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-emerald-600">Resumen</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-800">
-              Tu espacio financiero
+            <p className="text-sm font-semibold text-emerald-700">
+              Centro de mando financiero
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+              {activeSection === "overview"
+                ? `Hola, ${userEmail?.split("@")[0] ?? "bienvenido"}`
+                : activeSection === "upload"
+                  ? "Subir cartola"
+                  : activeSection === "budgets"
+                    ? "Presupuestos"
+                    : activeSection === "history"
+                      ? "Historial de movimientos"
+                      : "Centro financiero"}
             </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Administra y revisa tu información financiera desde un solo lugar.
+            <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
+              {activeSection === "overview"
+                ? "Tu plata, tus movimientos y lo que viene, todo claro en un mismo lugar."
+                : activeSection === "upload"
+                  ? "Importa tu cartola y deja que VaultTracker prepare tus movimientos."
+                  : activeSection === "budgets"
+                    ? "Define límites y sigue tus gastos por categoría."
+                    : "Busca, filtra y administra los movimientos de tu cuenta."}
             </p>
           </div>
           <div className="flex w-full flex-col gap-3 sm:max-w-xs">
@@ -1689,16 +1740,248 @@ export default function DashboardPage() {
                 ))}
               </select>
             </label>
-            <button
-              className="self-start rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700/80 transition hover:border-rose-500/50 hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-50 sm:self-end"
-              disabled={isClearingSandbox || savedTransactions.length === 0}
-              onClick={() => setIsSandboxConfirmOpen(true)}
-              type="button"
-            >
-              Borrar datos de prueba
-            </button>
+            {isDemoMode && (
+              <button
+                className="self-start rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700/80 transition hover:border-rose-500/50 hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-50 sm:self-end"
+                disabled={isClearingSandbox || savedTransactions.length === 0}
+                onClick={() => setIsSandboxConfirmOpen(true)}
+                type="button"
+              >
+                Borrar datos de prueba
+              </button>
+            )}
           </div>
         </div>
+
+        {activeSection === "overview" && (
+        <section
+          aria-label="Resumen y próximos movimientos"
+          className={`mb-8 grid gap-4 lg:grid-cols-12 ${activeSection === "overview" ? "" : "hidden"}`}
+          id="resumen"
+        >
+          <motion.article
+            className="relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-6 shadow-sm shadow-slate-200/50 sm:p-7 lg:col-span-5"
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            whileHover={reduceMotion ? undefined : { y: -3 }}
+          >
+            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-emerald-50 blur-3xl" />
+            <div className="relative">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">
+                    Balance del período
+                  </p>
+                  <p className="mt-3 text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+                    {formatCurrency(periodIncome - periodExpenses)}
+                  </p>
+                </div>
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                  <ChartNoAxesCombined aria-hidden="true" className="h-5 w-5" />
+                </span>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                {selectedMonth === "Todos"
+                  ? "Todos los tiempos"
+                  : new Intl.DateTimeFormat("es-CL", {
+                      month: "long",
+                      year: "numeric",
+                      timeZone: "UTC",
+                    }).format(new Date(`${selectedMonth}-01T00:00:00Z`))}
+              </p>
+              <div className="mt-7 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                    <ArrowUpRight
+                      aria-hidden="true"
+                      className="h-4 w-4 text-emerald-600"
+                    />
+                    Ingresos
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">
+                    {formatCurrency(periodIncome)}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                    <ArrowDownRight
+                      aria-hidden="true"
+                      className="h-4 w-4 text-rose-500"
+                    />
+                    Gastos
+                  </p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900">
+                    {formatCurrency(periodExpenses)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </motion.article>
+
+          <motion.article
+            className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm shadow-slate-200/50 sm:p-7 lg:col-span-4"
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08, duration: 0.4 }}
+            whileHover={reduceMotion ? undefined : { y: -3 }}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Próximos movimientos
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Una mirada a lo que viene
+                </p>
+              </div>
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <CalendarClock aria-hidden="true" className="h-5 w-5" />
+              </span>
+            </div>
+            <div className="mt-5 space-y-3">
+              {[
+                { name: "Netflix", due: "Vence en 3 días", amount: 8990 },
+                { name: "Arriendo", due: "Vence en 12 días", amount: 420000 },
+                { name: "Plan celular", due: "Vence en 19 días", amount: 14990 },
+              ].map((movement) => (
+                <div
+                  className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3.5 py-3"
+                  key={movement.name}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm">
+                      <CalendarClock
+                        aria-hidden="true"
+                        className="h-4 w-4"
+                      />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-800">
+                        {movement.name}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        {movement.due}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="shrink-0 text-xs font-semibold text-slate-700">
+                    {formatCurrency(movement.amount)}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 flex items-center gap-1.5 text-[11px] text-slate-500">
+              <Sparkles aria-hidden="true" className="h-3.5 w-3.5 text-emerald-600" />
+              Predicción de ejemplo basada en tus hábitos
+            </p>
+          </motion.article>
+
+          <motion.article
+            className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm shadow-slate-200/50 sm:p-7 lg:col-span-3"
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.16, duration: 0.4 }}
+            whileHover={reduceMotion ? undefined : { y: -3 }}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Presupuesto mensual
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {monthlyBudgetTotal > 0
+                    ? `${formatCurrency(budgetTrackedSpending)} gastados`
+                    : "Define tus límites"}
+                </p>
+              </div>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                <ShieldCheck aria-hidden="true" className="h-4 w-4" />
+              </span>
+            </div>
+            <div className="relative mx-auto mt-3 h-40 w-full max-w-[190px]">
+              {monthlyBudgetTotal > 0 ? (
+                <>
+                  <ResponsiveContainer height="100%" width="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          {
+                            name: "Gastado",
+                            value: Math.max(
+                              0.01,
+                              Math.min(budgetTrackedSpending, monthlyBudgetTotal),
+                            ),
+                            fill: "#10b981",
+                          },
+                          {
+                            name: "Disponible",
+                            value: Math.max(
+                              0,
+                              monthlyBudgetTotal - budgetTrackedSpending,
+                            ),
+                            fill: "#d1fae5",
+                          },
+                        ]}
+                        dataKey="value"
+                        innerRadius="72%"
+                        outerRadius="92%"
+                        stroke="none"
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        <Cell fill="#10b981" />
+                        <Cell fill="#d1fae5" />
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#ffffff",
+                          border: "1px solid #e2e8f0",
+                          borderRadius: "0.75rem",
+                          color: "#334155",
+                        }}
+                        formatter={(value) => formatCurrency(Number(value))}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-semibold tracking-tight text-slate-900">
+                      {Math.round(
+                        (budgetTrackedSpending / monthlyBudgetTotal) * 100,
+                      )}
+                      %
+                    </span>
+                    <span className="text-[10px] text-slate-500">utilizado</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center text-center">
+                  <span className="text-3xl font-semibold text-emerald-700">0%</span>
+                  <span className="mt-1 text-[10px] text-slate-500">
+                    Sin límites activos
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 text-slate-500">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Gastado
+              </span>
+              <span className="font-medium text-slate-700">
+                {formatCurrency(budgetRemaining)} disp.
+              </span>
+            </div>
+            <a
+              className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+              href="#budgets-title"
+            >
+              Ver presupuestos
+              <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
+            </a>
+          </motion.article>
+        </section>
+        )}
 
         {errorMsg && (
           <p
@@ -1724,9 +2007,13 @@ export default function DashboardPage() {
           </p>
         )}
 
+        {activeSection === "upload" && (
         <section
           aria-labelledby="statements-title"
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-10"
+          className={`rounded-3xl border border-slate-100 bg-white p-6 shadow-sm shadow-slate-200/50 sm:p-10 ${
+            ""
+          }`}
+          id="subir-cartola"
         >
           <div className="mx-auto max-w-3xl">
             <h2
@@ -1755,7 +2042,7 @@ export default function DashboardPage() {
               className={`mt-6 rounded-2xl border-2 border-dashed p-6 text-center transition-colors sm:p-10 ${
                 isDragging
                   ? "border-emerald-500 bg-emerald-50"
-                  : "border-slate-300 bg-white"
+                  : "border-slate-300 bg-slate-50"
               }`}
               onDragEnter={(event) => {
                 event.preventDefault();
@@ -1788,11 +2075,11 @@ export default function DashboardPage() {
                   />
                 </svg>
               </div>
-              <p className="mt-4 text-sm font-medium text-slate-700">
-                Arrastra tu cartola y suéltala aquí
+              <p className="mt-4 text-sm font-semibold text-slate-800">
+                Soltar tu cartola para que la IA la procese
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Formatos admitidos: CSV o PDF
+                Arrástrala aquí o selecciónala · PDF o CSV de Santander
               </p>
               <button
                 className="mt-5 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-emerald-500/50 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
@@ -1836,7 +2123,7 @@ export default function DashboardPage() {
                     Descartar
                   </button>
                   <button
-                    className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-emerald-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
                     disabled={isUploading}
                     onClick={handleProcessFile}
                     type="button"
@@ -2012,10 +2299,15 @@ export default function DashboardPage() {
             )}
           </div>
         </section>
+        )}
 
+        {activeSection === "budgets" && (
         <section
           aria-labelledby="budgets-title"
-          className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-8"
+          className={`mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-8 ${
+            ""
+          }`}
+          id="presupuestos"
         >
           <div className="mb-6">
             <p className="text-sm font-medium text-emerald-600">
@@ -2172,10 +2464,15 @@ export default function DashboardPage() {
             </>
           )}
         </section>
+        )}
 
+        {activeSection === "history" && (
         <section
           aria-labelledby="history-title"
-          className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-10"
+          className={`mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-10 ${
+            ""
+          }`}
+          id="historial"
         >
           <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
@@ -2423,7 +2720,7 @@ export default function DashboardPage() {
               <div className="max-h-[34rem] space-y-2 overflow-auto">
                 {paginatedTransactions.map((transaction, index) => (
                   <article
-                    className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm shadow-slate-200/40 transition hover:border-emerald-100 sm:gap-4 sm:p-4"
+                    className="group flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm shadow-slate-200/40 transition hover:border-emerald-100 sm:gap-4 sm:p-4"
                     key={
                       transaction.id ??
                       `${transaction.date}-${transaction.description}-${index}`
@@ -2474,6 +2771,21 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
+                      {(transaction.category === "Restaurantes" ||
+                        transaction.category === "Compras") && (
+                        <button
+                          className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-semibold text-emerald-700 transition hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                          onClick={() =>
+                            showManagementNotice(
+                              "La opción para dividir gastos estará disponible próximamente.",
+                            )
+                          }
+                          type="button"
+                        >
+                          <UsersRound aria-hidden="true" className="h-3 w-3" />
+                          Me deben
+                        </button>
+                      )}
                       <p
                         className={`whitespace-nowrap text-sm font-semibold sm:text-base ${
                           transaction.type === "INCOME"
@@ -2583,6 +2895,7 @@ export default function DashboardPage() {
             </>
           ) : null}
         </section>
+        )}
 
         {isManualFormOpen && (
           <div
@@ -2859,7 +3172,101 @@ export default function DashboardPage() {
             </section>
           </div>
         )}
-      </main>
+
+        <AnimatePresence>
+          {isAssistantOpen && (
+            <motion.section
+              aria-labelledby="assistant-title"
+              aria-modal="false"
+              className="fixed bottom-24 right-4 z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl shadow-slate-400/30 sm:bottom-28 sm:right-6"
+              initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              role="dialog"
+            >
+              <div className="flex items-center justify-between bg-emerald-700 px-4 py-3.5 text-white">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
+                    <Sparkles aria-hidden="true" className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-semibold" id="assistant-title">
+                      Tu asistente financiero
+                    </h2>
+                    <p className="mt-0.5 text-[10px] text-emerald-100">
+                      Listo para ayudarte
+                    </p>
+                  </div>
+                </div>
+                <button
+                  aria-label="Cerrar asistente"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 transition hover:bg-white/10 hover:text-white"
+                  onClick={() => setIsAssistantOpen(false)}
+                  type="button"
+                >
+                  <X aria-hidden="true" className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="max-h-80 space-y-3 overflow-y-auto bg-slate-50 p-4">
+                <p className="max-w-[90%] rounded-2xl rounded-tl-md bg-white p-3 text-xs leading-5 text-slate-700 shadow-sm">
+                  Hola, soy tu asistente financiero. ¿Qué quieres saber sobre tus
+                  gastos de este mes?
+                </p>
+                {assistantQuestion && (
+                  <p className="ml-auto max-w-[90%] rounded-2xl rounded-tr-md bg-emerald-100 p-3 text-xs leading-5 text-emerald-950">
+                    {assistantQuestion}
+                  </p>
+                )}
+                {assistantReply && (
+                  <p className="max-w-[90%] rounded-2xl rounded-tl-md bg-white p-3 text-xs leading-5 text-slate-700 shadow-sm">
+                    {assistantReply}
+                  </p>
+                )}
+              </div>
+              <form
+                className="flex items-center gap-2 border-t border-slate-100 p-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!assistantQuestion.trim()) return;
+                  setAssistantReply(
+                    `En el período seleccionado registras ${formatCurrency(periodExpenses)} en gastos y ${formatCurrency(periodIncome)} en ingresos. Puedes explorar el historial para ver el detalle por categoría.`,
+                  );
+                }}
+              >
+                <input
+                  aria-label="Escribe una pregunta"
+                  className="min-w-0 flex-1 rounded-xl bg-slate-100 px-3 py-2.5 text-xs text-slate-800 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500"
+                  onChange={(event) => {
+                    setAssistantQuestion(event.target.value);
+                    setAssistantReply("");
+                  }}
+                  placeholder="Pregunta sobre tus movimientos..."
+                  value={assistantQuestion}
+                />
+                <button
+                  aria-label="Enviar pregunta"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white transition hover:bg-emerald-700"
+                  type="submit"
+                >
+                  <Send aria-hidden="true" className="h-4 w-4" />
+                </button>
+              </form>
+            </motion.section>
+          )}
+        </AnimatePresence>
+
+        <motion.button
+          className="fixed bottom-4 right-4 z-[59] inline-flex items-center gap-2.5 rounded-full bg-emerald-700 px-4 py-3.5 text-sm font-semibold text-white shadow-xl shadow-emerald-900/20 transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 sm:bottom-6 sm:right-6 sm:px-5"
+          onClick={() => setIsAssistantOpen((current) => !current)}
+          type="button"
+          whileHover={reduceMotion ? undefined : { scale: 1.03, y: -2 }}
+          whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+        >
+          <Sparkles aria-hidden="true" className="h-5 w-5" />
+          <span>Pregúntale a tu asistente</span>
+        </motion.button>
+        </main>
     </div>
   );
 }
