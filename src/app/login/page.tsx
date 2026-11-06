@@ -12,8 +12,6 @@ import {
   Sparkles,
 } from "lucide-react";
 
-type OAuthProvider = "google" | "apple";
-
 function GoogleMark() {
   return (
     <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 48 48">
@@ -137,36 +135,6 @@ export default function LoginPage() {
     }
   }
 
-  async function handleOAuth(provider: OAuthProvider) {
-    setLoading(true);
-    setErrorMsg("");
-    setSuccessMsg("");
-
-    try {
-      const supabase = getSupabaseClient();
-      if (!supabase) return;
-
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-        },
-      });
-
-      if (error) {
-        setErrorMsg(error.message);
-      }
-    } catch (error) {
-      setErrorMsg(
-        error instanceof Error
-          ? error.message
-          : `No se pudo continuar con ${provider === "google" ? "Google" : "Apple"}.`,
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-4 py-20 text-slate-900 sm:px-6 sm:py-24">
       <Link
@@ -207,18 +175,14 @@ export default function LoginPage() {
 
           <div className="grid gap-3 sm:grid-cols-2">
             <button
-              className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loading}
-              onClick={() => void handleOAuth("google")}
+              className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
               type="button"
             >
               <GoogleMark />
               Continuar con Google
             </button>
             <button
-              className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loading}
-              onClick={() => void handleOAuth("apple")}
+              className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500"
               type="button"
             >
               <AppleMark />
