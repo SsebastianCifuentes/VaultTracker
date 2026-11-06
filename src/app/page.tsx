@@ -4,6 +4,14 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
+  ArrowDownRight,
+  ArrowUpRight,
+  CalendarClock,
+  CircleCheck,
+  CircleX,
+  Wallet,
+} from "lucide-react";
+import {
   Cell,
   Pie,
   PieChart,
@@ -29,6 +37,17 @@ interface DemoTransaction {
   category: DemoCategory;
 }
 
+type RecurringChargeStatus = "upcoming" | "paid" | "ignored";
+
+interface RecurringCharge {
+  id: number;
+  name: string;
+  amount: number;
+  daysUntilDue: number;
+  category: DemoCategory;
+  status: RecurringChargeStatus;
+}
+
 const demoCategories: DemoCategory[] = [
   "Viajes",
   "Ocio",
@@ -39,14 +58,51 @@ const demoCategories: DemoCategory[] = [
   "Pagos",
 ];
 
+const categoryEmojis: Record<DemoCategory, string> = {
+  Viajes: "✈️",
+  Ocio: "🎬",
+  Supermercado: "🛒",
+  Restaurantes: "🍔",
+  Transporte: "🚗",
+  "Vivienda/Gastos Comunes": "🏠",
+  Pagos: "💸",
+};
+
+const initialRecurringCharges: RecurringCharge[] = [
+  {
+    id: 101,
+    name: "Spotify",
+    amount: 5490,
+    daysUntilDue: 3,
+    category: "Ocio",
+    status: "upcoming",
+  },
+  {
+    id: 102,
+    name: "Arriendo",
+    amount: 520000,
+    daysUntilDue: 12,
+    category: "Vivienda/Gastos Comunes",
+    status: "upcoming",
+  },
+  {
+    id: 103,
+    name: "Netflix",
+    amount: 8990,
+    daysUntilDue: 6,
+    category: "Ocio",
+    status: "upcoming",
+  },
+];
+
 const demoColors: Record<DemoCategory, string> = {
-  Viajes: "#2dd4bf",
-  Ocio: "#a78bfa",
+  Viajes: "#0d9488",
+  Ocio: "#8b5cf6",
   Supermercado: "#34d399",
-  Restaurantes: "#fb7185",
-  Transporte: "#22d3ee",
-  "Vivienda/Gastos Comunes": "#f97316",
-  Pagos: "#818cf8",
+  Restaurantes: "#2dd4bf",
+  Transporte: "#06b6d4",
+  "Vivienda/Gastos Comunes": "#10b981",
+  Pagos: "#059669",
 };
 
 const initialDemoTransactions: DemoTransaction[] = [
@@ -166,21 +222,25 @@ const features = [
 function BrandMark({ small = false }: { small?: boolean }) {
   return (
     <span
-      className={`flex items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-400 ${
+      className={`flex items-center justify-center rounded-xl bg-emerald-600 shadow-sm shadow-emerald-900/10 ${
         small ? "h-9 w-9" : "h-11 w-11"
       }`}
     >
       <svg
         aria-hidden="true"
-        className={small ? "h-5 w-5" : "h-6 w-6"}
+        className={small ? "h-8 w-8" : "h-10 w-10"}
         fill="none"
-        stroke="currentColor"
+        stroke="white"
         strokeLinecap="round"
         strokeLinejoin="round"
-        strokeWidth="1.7"
-        viewBox="0 0 24 24"
+        strokeWidth="3.5"
+        viewBox="0 0 64 64"
       >
-        <path d="M5 10.5h14v9H5zM8 10.5V7a4 4 0 0 1 8 0v3.5m-4 4v1.5" />
+        <path
+          d="M32 12C20 12 16 18 16 28V38C16 48 32 54 32 54C32 54 48 48 48 38V28C48 18 44 12 32 12Z"
+        />
+        <path d="M25 36L30 31L34 35L39 28" />
+        <path d="M35 28H39V32" />
       </svg>
     </span>
   );
@@ -189,6 +249,12 @@ function BrandMark({ small = false }: { small?: boolean }) {
 export default function Home() {
   const shouldReduceMotion = useReducedMotion();
   const [transactions, setTransactions] = useState(initialDemoTransactions);
+  const [recurringCharges, setRecurringCharges] = useState(
+    initialRecurringCharges,
+  );
+  const [hoveredCategory, setHoveredCategory] = useState<DemoCategory | null>(
+    null,
+  );
   const [selectedCategory, setSelectedCategory] = useState<
     "Todas" | DemoCategory
   >("Todas");
@@ -238,7 +304,11 @@ export default function Home() {
         .reduce((total, transaction) => total + transaction.amount, 0),
     [filteredTransactions],
   );
-  const netBalance = totalIncome - totalExpenses;
+  const openingBalance = 650000;
+  const netBalance = openingBalance + totalIncome - totalExpenses;
+  const upcomingCharges = recurringCharges.filter(
+    (charge) => charge.status === "upcoming",
+  );
   const budgetSpending = useMemo(
     () =>
       filteredTransactions
@@ -271,6 +341,35 @@ export default function Home() {
     );
   }
 
+  function updateRecurringCharge(
+    charge: RecurringCharge,
+    status: Exclude<RecurringChargeStatus, "upcoming">,
+  ) {
+    setRecurringCharges((currentCharges) =>
+      currentCharges.map((currentCharge) =>
+        currentCharge.id === charge.id
+          ? { ...currentCharge, status }
+          : currentCharge,
+      ),
+    );
+
+    if (status === "paid") {
+      setTransactions((currentTransactions) => [
+        {
+          id:
+            Math.max(0, ...currentTransactions.map((transaction) => transaction.id)) +
+            1,
+          date: "Hoy",
+          description: `${charge.name} · cobro recurrente`,
+          amount: charge.amount,
+          type: "EXPENSE",
+          category: charge.category,
+        },
+        ...currentTransactions,
+      ]);
+    }
+  }
+
   function formatCurrency(amount: number) {
     return new Intl.NumberFormat("es-CL", {
       style: "currency",
@@ -280,13 +379,13 @@ export default function Home() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
+    <main className="relative min-h-screen overflow-hidden bg-white text-slate-900">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -top-56 left-1/2 h-[34rem] w-[52rem] -translate-x-1/2 rounded-full bg-emerald-500/[0.09] blur-3xl"
       />
 
-      <header className="relative border-b border-slate-800/80">
+      <header className="relative border-b border-slate-200">
         <nav
           aria-label="Navegación principal"
           className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8"
@@ -297,12 +396,12 @@ export default function Home() {
             href="/"
           >
             <BrandMark small />
-            <span className="text-sm font-semibold tracking-[0.16em] text-white">
+            <span className="text-sm font-semibold tracking-[0.16em] text-slate-900">
               VAULTTRACKER
             </span>
           </Link>
           <Link
-            className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:border-emerald-500/60 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+            className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-emerald-500/60 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
             href="/login"
           >
             Iniciar sesión
@@ -322,15 +421,15 @@ export default function Home() {
           initial={shouldReduceMotion ? false : { opacity: 0, y: 20 }}
           transition={{ delay: 0.12, duration: 0.55, ease: "easeOut" }}
         >
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-2 text-xs font-medium text-emerald-300">
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/70 px-3.5 py-2 text-xs font-medium text-emerald-800">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             Claridad para tus decisiones financieras
           </div>
-          <h1 className="text-4xl font-semibold leading-[1.12] tracking-tight text-white sm:text-5xl lg:text-6xl">
+          <h1 className="text-4xl font-semibold leading-[1.12] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
             Toma el control de tu{" "}
-            <span className="text-emerald-400">patrimonio financiero.</span>
+            <span className="text-emerald-600">patrimonio financiero.</span>
           </h1>
-          <p className="mt-6 max-w-xl text-base leading-7 text-slate-400 sm:text-lg sm:leading-8">
+          <p className="mt-6 max-w-xl text-base leading-7 text-slate-500 sm:text-lg sm:leading-8">
             Reúne tus movimientos en un solo lugar. Importa tu cartola y
             convierte tus transacciones en una visión clara de tus ingresos y
             gastos.
@@ -341,7 +440,7 @@ export default function Home() {
               whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
             >
               <Link
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-5 py-3.5 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-950/30 transition hover:bg-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-900/10 transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
                 href="/login"
               >
                 Comenzar ahora
@@ -360,7 +459,7 @@ export default function Home() {
               </Link>
             </motion.div>
             <motion.a
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-400/[0.07] px-5 py-3.5 text-sm font-semibold text-emerald-200 transition hover:border-emerald-300/60 hover:bg-emerald-400/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50/70 px-5 py-3.5 text-sm font-semibold text-emerald-800 transition hover:border-emerald-300/60 hover:bg-emerald-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
               href="#demo-interactivo"
               whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
               whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
@@ -380,7 +479,7 @@ export default function Home() {
               </svg>
             </motion.a>
             <motion.a
-              className="inline-flex items-center justify-center rounded-lg border border-slate-700 px-5 py-3.5 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+              className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-5 py-3.5 text-sm font-medium text-slate-700 transition hover:border-slate-500 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
               href="#caracteristicas"
               whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
               whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
@@ -391,7 +490,7 @@ export default function Home() {
           <div className="mt-8 flex items-center gap-3 text-xs text-slate-500">
             <svg
               aria-hidden="true"
-              className="h-4 w-4 text-emerald-400"
+              className="h-4 w-4 text-emerald-600"
               fill="none"
               stroke="currentColor"
               strokeLinecap="round"
@@ -414,14 +513,14 @@ export default function Home() {
         >
           <div
             aria-hidden="true"
-            className="absolute -inset-5 rounded-[2rem] bg-emerald-500/[0.07] blur-2xl"
+            className="absolute -inset-5 rounded-[2rem] bg-emerald-50/60 blur-2xl"
           />
-          <div className="relative rounded-2xl border border-slate-800 bg-slate-900/90 p-5 shadow-2xl shadow-black/30 sm:p-7">
-            <div className="flex items-center justify-between gap-4 border-b border-slate-800 pb-5">
+          <div className="relative rounded-2xl border border-slate-100/80 bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-7">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-5">
               <div className="flex items-center gap-3">
                 <BrandMark small />
                 <div>
-                  <p className="text-sm font-semibold text-white">
+                  <p className="text-sm font-semibold text-slate-900">
                     Resumen financiero
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
@@ -429,14 +528,14 @@ export default function Home() {
                   </p>
                 </div>
               </div>
-              <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-medium text-emerald-300">
+              <span className="rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[10px] font-medium text-emerald-800">
                 EJEMPLO
               </span>
             </div>
 
             <div className="mt-6">
-              <p className="text-xs text-slate-400">Balance neto</p>
-              <p className="mt-2 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              <p className="text-xs text-slate-500">Balance neto</p>
+              <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
                 $ 482.350
               </p>
               <p className="mt-2 text-xs text-slate-500">
@@ -445,25 +544,25 @@ export default function Home() {
             </div>
 
             <div className="mt-7 grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-                <div className="flex items-center gap-2 text-xs text-slate-400">
+              <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/40">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
                   <span className="h-2 w-2 rounded-full bg-emerald-400" />
                   Ingresos
                 </div>
-                <p className="mt-3 text-lg font-semibold text-white">$ 850.000</p>
+                <p className="mt-3 text-lg font-semibold text-slate-900">$ 850.000</p>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-                <div className="flex items-center gap-2 text-xs text-slate-400">
+              <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/40">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
                   <span className="h-2 w-2 rounded-full bg-rose-400" />
                   Gastos
                 </div>
-                <p className="mt-3 text-lg font-semibold text-white">$ 367.650</p>
+                <p className="mt-3 text-lg font-semibold text-slate-900">$ 367.650</p>
               </div>
             </div>
 
-            <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950/70 p-4">
+            <div className="mt-5 rounded-xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/40">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-300">
+                <p className="text-xs font-medium text-slate-700">
                   Actividad reciente
                 </p>
                 <span className="text-[10px] text-slate-500">ÚLTIMOS MOVIMIENTOS</span>
@@ -471,7 +570,7 @@ export default function Home() {
               <div className="mt-4 space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-400/10 text-rose-300">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-700">
                       <svg
                         aria-hidden="true"
                         className="h-4 w-4"
@@ -486,7 +585,7 @@ export default function Home() {
                       </svg>
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-slate-200">
+                      <p className="truncate text-xs font-medium text-slate-700">
                         Compra con tarjeta
                       </p>
                       <p className="mt-1 text-[10px] text-slate-500">
@@ -494,13 +593,13 @@ export default function Home() {
                       </p>
                     </div>
                   </div>
-                  <span className="shrink-0 text-xs font-medium text-slate-300">
+                  <span className="shrink-0 text-xs font-medium text-slate-700">
                     −$ 24.990
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-400/10 text-emerald-300">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
                       <svg
                         aria-hidden="true"
                         className="h-4 w-4"
@@ -515,7 +614,7 @@ export default function Home() {
                       </svg>
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-slate-200">
+                      <p className="truncate text-xs font-medium text-slate-700">
                         Depósito recibido
                       </p>
                       <p className="mt-1 text-[10px] text-slate-500">
@@ -523,7 +622,7 @@ export default function Home() {
                       </p>
                     </div>
                   </div>
-                  <span className="shrink-0 text-xs font-medium text-emerald-300">
+                  <span className="shrink-0 text-xs font-medium text-emerald-700">
                     +$ 120.000
                   </span>
                 </div>
@@ -535,7 +634,7 @@ export default function Home() {
 
       <motion.section
         aria-labelledby="interactive-demo-title"
-        className="relative border-y border-slate-800/80 bg-slate-900/35"
+        className="relative border-y border-slate-200 bg-emerald-50/40"
         id="demo-interactivo"
         initial={shouldReduceMotion ? false : { opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -550,41 +649,54 @@ export default function Home() {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <p className="text-sm font-medium text-emerald-400">
+            <p className="text-sm font-medium text-emerald-600">
               Explora con datos de ejemplo
             </p>
             <h2
-              className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl"
+              className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl"
               id="interactive-demo-title"
             >
               Prueba el potencial de VaultTracker
             </h2>
-            <p className="mt-4 text-sm leading-6 text-slate-400 sm:text-base">
+            <p className="mt-4 text-sm leading-6 text-slate-500 sm:text-base">
               Filtra movimientos, cambia categorías y ajusta tus límites. Todo
               lo que ves es interactivo y ocurre en esta página.
             </p>
           </motion.div>
 
           <motion.div
-            className="rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-2xl shadow-black/20 sm:p-7 lg:p-8"
+            className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-xl shadow-slate-200/50 ring-1 ring-emerald-100/60"
             initial={shouldReduceMotion ? false : { opacity: 0, y: 22 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.1 }}
             transition={{ delay: 0.1, duration: 0.55 }}
           >
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+              <div aria-hidden="true" className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-rose-400/90" />
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-300/90" />
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/90" />
+              </div>
+              <div className="flex items-center gap-2 text-[10px] font-medium tracking-wide text-slate-500 sm:text-xs">
+                <Wallet aria-hidden="true" className="h-3.5 w-3.5 text-emerald-600" />
+                VaultTracker · Vista previa interactiva
+              </div>
+              <span aria-hidden="true" className="w-10" />
+            </div>
+            <div className="p-4 sm:p-7 lg:p-8">
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-white">
+                <p className="text-sm font-semibold text-slate-900">
                   Resumen de noviembre
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   Datos ficticios · prueba los controles para explorar
                 </p>
               </div>
-              <label className="flex items-center gap-2 text-xs text-slate-400">
+              <label className="flex items-center gap-2 text-xs text-slate-500">
                 Categoría
                 <select
-                  className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                   onChange={(event) =>
                     setSelectedCategory(
                       event.target.value === "Todas"
@@ -604,36 +716,38 @@ export default function Home() {
               </label>
             </div>
 
-            <div className="mb-5 grid gap-3 sm:grid-cols-3">
+            <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <motion.article
-                className="rounded-xl border border-rose-500/15 bg-rose-500/[0.04] p-4"
+                className="rounded-xl border border-slate-100/80 bg-white p-4 shadow-sm shadow-slate-200/50"
                 whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
                 whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
               >
-                <p className="text-xs font-medium text-rose-300">
-                  Total Gastos
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-slate-500">Saldo Inicial</p>
+                  <Wallet aria-hidden="true" className="h-4 w-4 text-slate-500" />
+                </div>
                 <motion.p
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-2 text-xl font-semibold text-white"
+                  className="mt-2 text-xl font-semibold text-slate-900"
                   initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
-                  key={totalExpenses}
+                  key={openingBalance}
                   transition={{ duration: 0.2 }}
                 >
-                  {formatCurrency(totalExpenses)}
+                  {formatCurrency(openingBalance)}
                 </motion.p>
               </motion.article>
               <motion.article
-                className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] p-4"
+                className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm shadow-slate-200/50"
                 whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
                 whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
               >
-                <p className="text-xs font-medium text-emerald-300">
-                  Total Pagos
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-emerald-800">Ingresos (+)</p>
+                  <ArrowUpRight aria-hidden="true" className="h-4 w-4 text-emerald-600" />
+                </div>
                 <motion.p
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-2 text-xl font-semibold text-white"
+                  className="mt-2 text-xl font-semibold text-slate-900"
                   initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
                   key={totalIncome}
                   transition={{ duration: 0.2 }}
@@ -642,17 +756,37 @@ export default function Home() {
                 </motion.p>
               </motion.article>
               <motion.article
-                className="rounded-xl border border-slate-700 bg-slate-950/60 p-4"
+                className="rounded-xl border border-rose-100 bg-white p-4 shadow-sm shadow-slate-200/50"
                 whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
                 whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
               >
-                <p className="text-xs font-medium text-slate-400">
-                  Balance Neto
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-rose-700">Gastos (-)</p>
+                  <ArrowDownRight aria-hidden="true" className="h-4 w-4 text-rose-400" />
+                </div>
+                <motion.p
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-xl font-semibold text-slate-900"
+                  initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
+                  key={totalExpenses}
+                  transition={{ duration: 0.2 }}
+                >
+                  {formatCurrency(totalExpenses)}
+                </motion.p>
+              </motion.article>
+              <motion.article
+                className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 shadow-sm shadow-slate-200/50"
+                whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
+                whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-slate-700">Balance Resultante</p>
+                  <Wallet aria-hidden="true" className="h-4 w-4 text-emerald-600" />
+                </div>
                 <motion.p
                   animate={{ opacity: 1, y: 0 }}
                   className={`mt-2 text-xl font-semibold ${
-                    netBalance < 0 ? "text-rose-300" : "text-white"
+                    netBalance < 0 ? "text-rose-700" : "text-slate-900"
                   }`}
                   initial={shouldReduceMotion ? false : { opacity: 0.6, y: 4 }}
                   key={netBalance}
@@ -663,13 +797,95 @@ export default function Home() {
               </motion.article>
             </div>
 
+            <motion.article
+              className="mb-5 rounded-xl border border-emerald-500/15 bg-white p-4 sm:p-5"
+              initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.2 }}
+              transition={{ duration: 0.35 }}
+            >
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                    <CalendarClock aria-hidden="true" className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Próximos cobros y suscripciones
+                    </h3>
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Marca un cobro como pagado para incluirlo en tu flujo
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded-full border border-emerald-200 bg-emerald-100 px-2.5 py-1 text-[10px] font-medium text-emerald-800">
+                  {upcomingCharges.length} pendientes
+                </span>
+              </div>
+              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {upcomingCharges.map((charge) => (
+                  <motion.div
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white p-3 shadow-sm shadow-slate-200/40"
+                    key={charge.id}
+                    layout={!shouldReduceMotion}
+                    whileHover={shouldReduceMotion ? undefined : { scale: 1.015 }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.99 }}
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-lg">
+                        {categoryEmojis[charge.category]}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-slate-700">
+                          {charge.name}
+                        </p>
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          {formatCurrency(charge.amount)} · vence en{" "}
+                          {charge.daysUntilDue} días
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <motion.button
+                        aria-label={`Marcar ${charge.name} como pagado`}
+                        className="rounded-md p-1.5 text-slate-500 transition hover:bg-emerald-100 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-emerald-400"
+                        onClick={() => updateRecurringCharge(charge, "paid")}
+                        title="Marcar pagado"
+                        type="button"
+                        whileHover={shouldReduceMotion ? undefined : { scale: 1.12 }}
+                        whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
+                      >
+                        <CircleCheck aria-hidden="true" className="h-4 w-4" />
+                      </motion.button>
+                      <motion.button
+                        aria-label={`Ignorar cobro de ${charge.name}`}
+                        className="rounded-md p-1.5 text-slate-500 transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-2 focus-visible:outline-rose-400"
+                        onClick={() => updateRecurringCharge(charge, "ignored")}
+                        title="Ignorar cobro"
+                        type="button"
+                        whileHover={shouldReduceMotion ? undefined : { scale: 1.12 }}
+                        whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
+                      >
+                        <CircleX aria-hidden="true" className="h-4 w-4" />
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                ))}
+                {upcomingCharges.length === 0 && (
+                  <p className="rounded-lg border border-dashed border-slate-200 px-3 py-5 text-center text-xs text-slate-500 md:col-span-2 xl:col-span-3">
+                    Ya revisaste todos los cobros de ejemplo.
+                  </p>
+                )}
+              </div>
+            </motion.article>
+
             <div className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
               <motion.article
-                className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5"
+                className="rounded-xl border border-slate-100/80 bg-white p-4 shadow-sm shadow-slate-200/50 sm:p-5"
                 whileHover={shouldReduceMotion ? undefined : { scale: 1.01 }}
               >
                 <div>
-                  <h3 className="text-sm font-semibold text-white">
+                  <h3 className="text-sm font-semibold text-slate-900">
                     Distribución de gastos
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
@@ -686,7 +902,7 @@ export default function Home() {
                           innerRadius="57%"
                           isAnimationActive={!shouldReduceMotion}
                           nameKey="category"
-                          outerRadius="84%"
+                          outerRadius={hoveredCategory ? "88%" : "84%"}
                           paddingAngle={3}
                           stroke="none"
                         >
@@ -694,8 +910,12 @@ export default function Home() {
                             <Cell
                               fill={demoColors[entry.category]}
                               fillOpacity={
-                                selectedCategory === "Todas" ||
-                                selectedCategory === entry.category
+                                hoveredCategory
+                                  ? hoveredCategory === entry.category
+                                    ? 1
+                                    : 0.45
+                                  : selectedCategory === "Todas" ||
+                                      selectedCategory === entry.category
                                   ? 1
                                   : 0.35
                               }
@@ -707,16 +927,31 @@ export default function Home() {
                                     : entry.category,
                                 )
                               }
-                              style={{ cursor: "pointer" }}
+                              onMouseEnter={() =>
+                                setHoveredCategory(entry.category)
+                              }
+                              onMouseLeave={() => setHoveredCategory(null)}
+                              stroke={
+                                hoveredCategory === entry.category
+                                  ? "#334155"
+                                  : "none"
+                              }
+                              strokeWidth={hoveredCategory === entry.category ? 2 : 0}
+                              style={{
+                                cursor: "pointer",
+                                transition: shouldReduceMotion
+                                  ? undefined
+                                  : "fill-opacity 180ms ease, stroke-width 180ms ease",
+                              }}
                             />
                           ))}
                         </Pie>
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: "#0f172a",
-                            border: "1px solid #334155",
+                            backgroundColor: "#ffffff",
+                            border: "1px solid #e2e8f0",
                             borderRadius: "0.75rem",
-                            color: "#e2e8f0",
+                            color: "#334155",
                           }}
                           formatter={(value, name) => [
                             formatCurrency(Number(value)),
@@ -745,10 +980,14 @@ export default function Home() {
                               )
                             }
                             type="button"
+                            onMouseEnter={() =>
+                              setHoveredCategory(entry.category)
+                            }
+                            onMouseLeave={() => setHoveredCategory(null)}
                             whileHover={shouldReduceMotion ? undefined : { x: 2 }}
                             whileTap={shouldReduceMotion ? undefined : { scale: 0.98 }}
                           >
-                            <span className="flex min-w-0 items-center gap-2 text-slate-300">
+                            <span className="flex min-w-0 items-center gap-2 text-slate-700">
                               <span
                                 aria-hidden="true"
                                 className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -756,6 +995,9 @@ export default function Home() {
                                   backgroundColor: demoColors[entry.category],
                                 }}
                               />
+                              <span aria-hidden="true">
+                                {categoryEmojis[entry.category]}
+                              </span>
                               <span className="truncate">{entry.category}</span>
                             </span>
                             <span className="shrink-0 text-slate-500">
@@ -770,12 +1012,12 @@ export default function Home() {
               </motion.article>
 
               <motion.article
-                className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5"
+                className="rounded-xl border border-slate-100/80 bg-white p-4 shadow-sm shadow-slate-200/50 sm:p-5"
                 whileHover={shouldReduceMotion ? undefined : { scale: 1.005 }}
               >
                 <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">
+                    <h3 className="text-sm font-semibold text-slate-900">
                       Movimientos recientes
                     </h3>
                     <p className="mt-1 text-xs text-slate-500">
@@ -787,9 +1029,9 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div className="overflow-x-auto rounded-lg border border-slate-800">
-                  <table className="min-w-full divide-y divide-slate-800 text-left text-xs">
-                    <thead className="bg-slate-900 text-[10px] uppercase tracking-wide text-slate-500">
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
+                    <thead className="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
                       <tr>
                         <th className="px-3 py-3 font-medium" scope="col">
                           Fecha
@@ -811,12 +1053,12 @@ export default function Home() {
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/80">
+                    <tbody className="divide-y divide-slate-200">
                       {filteredTransactions.map((transaction) => (
                         <motion.tr
-                          className="text-slate-300"
+                          className="text-slate-700"
                           key={transaction.id}
-                          whileHover={shouldReduceMotion ? undefined : { scale: 1.005, backgroundColor: "rgba(30, 41, 59, 0.45)" }}
+                          whileHover={shouldReduceMotion ? undefined : { scale: 1.005, backgroundColor: "rgba(236, 253, 245, 0.9)" }}
                           whileTap={shouldReduceMotion ? undefined : { scale: 0.995 }}
                           transition={{ duration: 0.15 }}
                         >
@@ -829,33 +1071,65 @@ export default function Home() {
                             </span>
                           </td>
                           <td className="whitespace-nowrap px-3 py-2">
-                            <select
-                              aria-label={`Categoría de ${transaction.description}`}
-                              className="max-w-40 rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] text-slate-200 outline-none focus:border-emerald-500"
-                              onChange={(event) => {
-                                const category =
-                                  demoCategories.find(
-                                    (option) => option === event.target.value,
-                                  ) ?? "Ocio";
-                                updateTransactionCategory(
-                                  transaction.id,
-                                  category,
-                                );
-                              }}
-                              value={transaction.category}
-                            >
-                              {demoCategories.map((category) => (
-                                <option key={category} value={category}>
-                                  {category}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <motion.button
+                                aria-label={`Filtrar por ${transaction.category}`}
+                                aria-pressed={
+                                  selectedCategory === transaction.category
+                                }
+                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] transition ${
+                                  selectedCategory === transaction.category
+                                    ? "border-emerald-200 bg-emerald-100 text-emerald-800"
+                                    : "border-slate-200 bg-slate-100 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+                                }`}
+                                onClick={() =>
+                                  setSelectedCategory((currentCategory) =>
+                                    currentCategory === transaction.category
+                                      ? "Todas"
+                                      : transaction.category,
+                                  )
+                                }
+                                type="button"
+                                whileHover={
+                                  shouldReduceMotion ? undefined : { scale: 1.06 }
+                                }
+                                whileTap={
+                                  shouldReduceMotion ? undefined : { scale: 0.94 }
+                                }
+                              >
+                                <span aria-hidden="true">
+                                  {categoryEmojis[transaction.category]}
+                                </span>
+                                {transaction.category}
+                              </motion.button>
+                              <select
+                                aria-label={`Editar categoría de ${transaction.description}`}
+                                className="max-w-36 rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-700 outline-none focus:border-emerald-500"
+                                onChange={(event) => {
+                                  const category =
+                                    demoCategories.find(
+                                      (option) => option === event.target.value,
+                                    ) ?? "Ocio";
+                                  updateTransactionCategory(
+                                    transaction.id,
+                                    category,
+                                  );
+                                }}
+                                value={transaction.category}
+                              >
+                                {demoCategories.map((category) => (
+                                  <option key={category} value={category}>
+                                    {categoryEmojis[category]} {category}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </td>
                           <td
                             className={`whitespace-nowrap px-3 py-3 text-right font-medium ${
                               transaction.type === "INCOME"
-                                ? "text-emerald-300"
-                                : "text-slate-200"
+                                ? "text-emerald-800"
+                                : "text-slate-700"
                             }`}
                           >
                             {transaction.type === "INCOME" ? "+" : "−"}
@@ -864,7 +1138,7 @@ export default function Home() {
                           <td className="whitespace-nowrap px-3 py-2 text-right">
                             <motion.button
                               aria-label={`Eliminar ${transaction.description} de la demo`}
-                              className="rounded-md p-1.5 text-slate-500 transition hover:bg-rose-400/10 hover:text-rose-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
+                              className="rounded-md p-1.5 text-slate-500 transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
                               onClick={() => removeTransaction(transaction.id)}
                               title={`Eliminar ${transaction.description}`}
                               type="button"
@@ -903,9 +1177,9 @@ export default function Home() {
               </motion.article>
             </div>
 
-            <article className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5">
+            <article className="mt-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
               <div className="mb-4">
-                <h3 className="text-sm font-semibold text-white">
+                <h3 className="text-sm font-semibold text-slate-900">
                   Metas de presupuesto
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
@@ -926,20 +1200,20 @@ export default function Home() {
                           : "bg-rose-400";
                     const progressTextColor =
                       progress < 75
-                        ? "text-emerald-300"
+                        ? "text-emerald-800"
                         : progress <= 95
-                          ? "text-amber-300"
-                          : "text-rose-300";
+                          ? "text-amber-700"
+                          : "text-rose-700";
 
                     return (
                       <motion.div
-                        className="rounded-lg border border-slate-800 bg-slate-900/70 p-4"
+                        className="rounded-lg border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/40"
                         key={category}
                         whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
                         transition={{ duration: 0.18 }}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-slate-200">
+                          <span className="text-xs font-medium text-slate-700">
                             {category}
                           </span>
                           <motion.span
@@ -956,7 +1230,7 @@ export default function Home() {
                           <span>Gastado {formatCurrency(spent)}</span>
                           <span>Límite {formatCurrency(limit)}</span>
                         </div>
-                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
                           <motion.div
                             animate={{ width: `${Math.min(progress, 100)}%` }}
                             className={`h-full rounded-full transition-all ${progressColor}`}
@@ -992,14 +1266,14 @@ export default function Home() {
             </article>
 
             <motion.div
-              className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-slate-800 pt-5 text-center sm:flex-row sm:text-left"
+              className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-5 text-center sm:flex-row sm:text-left"
               whileHover={shouldReduceMotion ? undefined : { scale: 1.005 }}
             >
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-slate-500">
                 ¿Quieres usarlo con tus cartolas reales?
               </p>
               <Link
-                className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+                className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
                 href="/login"
               >
                 Crear cuenta / Iniciar sesión
@@ -1017,13 +1291,14 @@ export default function Home() {
                 </svg>
               </Link>
             </motion.div>
+            </div>
           </motion.div>
         </div>
       </motion.section>
 
       <motion.section
         aria-labelledby="features-title"
-        className="relative border-y border-slate-800/80 bg-slate-900/30"
+        className="relative border-y border-slate-200 bg-slate-50"
         id="caracteristicas"
         initial={shouldReduceMotion ? false : { opacity: 0, y: 28 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -1038,16 +1313,16 @@ export default function Home() {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <p className="text-sm font-medium text-emerald-400">
+            <p className="text-sm font-medium text-emerald-600">
               Finanzas más simples
             </p>
             <h2
-              className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl"
+              className="mt-3 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl"
               id="features-title"
             >
               Todo lo importante, en un solo lugar.
             </h2>
-            <p className="mt-4 text-sm leading-6 text-slate-400 sm:text-base">
+            <p className="mt-4 text-sm leading-6 text-slate-500 sm:text-base">
               Menos tiempo ordenando datos. Más claridad para entender cómo se
               mueve tu dinero.
             </p>
@@ -1057,7 +1332,7 @@ export default function Home() {
             {features.map((feature, index) => (
               <motion.article
                 initial={shouldReduceMotion ? false : { opacity: 0, y: 22 }}
-                className="rounded-2xl border border-slate-800 bg-slate-950/80 p-6 transition hover:border-emerald-500/30 sm:p-7"
+                className="rounded-2xl border border-slate-200 bg-white p-6 transition hover:border-emerald-500/30 sm:p-7"
                 key={feature.number}
                 whileInView={{ opacity: 1, y: 0 }}
                 whileHover={shouldReduceMotion ? undefined : { scale: 1.02 }}
@@ -1066,7 +1341,7 @@ export default function Home() {
                 transition={{ delay: index * 0.12, duration: 0.45 }}
               >
                 <div className="flex items-center justify-between">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10 text-emerald-400">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-100 text-emerald-600">
                     <svg
                       aria-hidden="true"
                       className="h-5 w-5"
@@ -1080,14 +1355,14 @@ export default function Home() {
                       {feature.icon}
                     </svg>
                   </span>
-                  <span className="text-xs font-medium tracking-widest text-slate-600">
+                  <span className="text-xs font-medium tracking-widest text-slate-500">
                     {feature.number}
                   </span>
                 </div>
-                <h3 className="mt-6 text-lg font-semibold text-white">
+                <h3 className="mt-6 text-lg font-semibold text-slate-900">
                   {feature.title}
                 </h3>
-                <p className="mt-3 text-sm leading-6 text-slate-400">
+                <p className="mt-3 text-sm leading-6 text-slate-500">
                   {feature.description}
                 </p>
               </motion.article>
@@ -1104,21 +1379,21 @@ export default function Home() {
             href="/"
           >
             <BrandMark small />
-            <span className="text-xs font-semibold tracking-[0.16em] text-slate-300">
+            <span className="text-xs font-semibold tracking-[0.16em] text-slate-700">
               VAULTTRACKER
             </span>
           </Link>
           <p className="text-xs text-slate-500">
             © 2026 VaultTracker. Todos los derechos reservados.
           </p>
-          <div className="flex items-center gap-5 text-xs text-slate-400">
+          <div className="flex items-center gap-5 text-xs text-slate-500">
             <a
-              className="transition hover:text-emerald-300"
+              className="transition hover:text-emerald-800"
               href="#caracteristicas"
             >
               Características
             </a>
-            <Link className="transition hover:text-emerald-300" href="/login">
+            <Link className="transition hover:text-emerald-800" href="/login">
               Acceder
             </Link>
           </div>
