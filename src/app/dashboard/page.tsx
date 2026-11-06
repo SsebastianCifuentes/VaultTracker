@@ -55,6 +55,36 @@ function getLocalMonthString() {
   return getLocalDateString().slice(0, 7);
 }
 
+function HistorySkeletons() {
+  return (
+    <div aria-label="Cargando transacciones" className="animate-pulse" role="status">
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        {Array.from({ length: 3 }, (_, index) => (
+          <div
+            className="h-24 rounded-xl border border-slate-800 bg-slate-950/60"
+            key={index}
+          />
+        ))}
+      </div>
+      <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="h-80 rounded-xl border border-slate-800 bg-slate-950/60" />
+        <div className="h-80 rounded-xl border border-slate-800 bg-slate-950/60" />
+      </div>
+      <div className="overflow-hidden rounded-xl border border-slate-800">
+        <div className="h-11 bg-slate-950" />
+        {Array.from({ length: 5 }, (_, index) => (
+          <div
+            className="h-14 border-t border-slate-800 bg-slate-900"
+            key={index}
+          >
+            <div className="mx-4 mt-5 h-3 w-2/3 rounded bg-slate-800" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
   Ocio: "#a78bfa",
   Restaurantes: "#fb7185",
@@ -304,6 +334,7 @@ export default function DashboardPage() {
     string | null
   >(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [historyPage, setHistoryPage] = useState(1);
   const [historyError, setHistoryError] = useState("");
   const [categoryError, setCategoryError] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todas");
@@ -318,6 +349,8 @@ export default function DashboardPage() {
   >(null);
   const [managementError, setManagementError] = useState("");
   const [managementNotice, setManagementNotice] = useState("");
+  const [isSandboxConfirmOpen, setIsSandboxConfirmOpen] = useState(false);
+  const [isClearingSandbox, setIsClearingSandbox] = useState(false);
   const [isManualFormOpen, setIsManualFormOpen] = useState(false);
   const [isSavingManual, setIsSavingManual] = useState(false);
   const [manualFormError, setManualFormError] = useState("");
@@ -606,6 +639,7 @@ export default function DashboardPage() {
             : savedTransaction,
         ),
       );
+      showManagementNotice("Categoría actualizada correctamente.");
     } catch (error) {
       setCategoryError(
         error instanceof Error
@@ -628,6 +662,45 @@ export default function DashboardPage() {
       setManagementNotice("");
       noticeTimeoutRef.current = null;
     }, 3500);
+  }
+
+  async function handleClearSandboxData() {
+    if (!supabase || !userId) {
+      setManagementError(
+        "No se pudo verificar tu sesión para borrar los datos de prueba.",
+      );
+      return;
+    }
+
+    setIsClearingSandbox(true);
+    setManagementError("");
+
+    try {
+      const { error } = await supabase
+        .from("transactions")
+        .delete()
+        .eq("user_id", userId);
+
+      if (error) {
+        setManagementError(
+          `No se pudieron borrar los datos de prueba: ${error.message}`,
+        );
+        return;
+      }
+
+      setSavedTransactions([]);
+      setHistoryPage(1);
+      setIsSandboxConfirmOpen(false);
+      showManagementNotice("Datos de prueba borrados correctamente.");
+    } catch (error) {
+      setManagementError(
+        error instanceof Error
+          ? `No se pudieron borrar los datos de prueba: ${error.message}`
+          : "Ocurrió un error inesperado al borrar los datos de prueba.",
+      );
+    } finally {
+      setIsClearingSandbox(false);
+    }
   }
 
   async function handleSaveBudget(category: string) {
@@ -978,16 +1051,27 @@ export default function DashboardPage() {
         fileInputRef.current.value = "";
       }
       setFileError("");
-      setSaveMessage({
-        type: "success",
-        text: `${dataToInsert.length} ${
-          dataToInsert.length === 1 ? "transacción nueva guardada" : "transacciones nuevas guardadas"
-        }, ${duplicateCount} ${
-          duplicateCount === 1
-            ? "ignorada por duplicación."
-            : "ignoradas por duplicación."
-        }`,
-      });
+      const savedSummary =
+        dataToInsert.length === 0
+          ? "No se guardaron transacciones nuevas."
+          : `${dataToInsert.length} ${
+              dataToInsert.length === 1
+                ? "transacción guardada exitosamente"
+                : "transacciones guardadas exitosamente"
+            }`;
+      const duplicateSummary =
+        duplicateCount === 0
+          ? ""
+          : `${duplicateCount} ${
+              duplicateCount === 1
+                ? "transacción existente omitida"
+                : "transacciones existentes omitidas"
+            }`;
+      const saveSummary = [savedSummary, duplicateSummary]
+        .filter(Boolean)
+        .join("; ");
+      setSaveMessage(null);
+      showManagementNotice(saveSummary);
     } catch (error) {
       setSaveMessage({
         type: "error",
@@ -1118,6 +1202,30 @@ export default function DashboardPage() {
 
     return matchesCategory && matchesType && matchesMonth && matchesSearch;
   });
+  const historyPageSize = 10;
+  const historyPageCount = Math.max(
+    1,
+    Math.ceil(filteredTransactions.length / historyPageSize),
+  );
+  const currentHistoryPage = Math.min(historyPage, historyPageCount);
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentHistoryPage - 1) * historyPageSize,
+    currentHistoryPage * historyPageSize,
+  );
+  const firstVisibleTransaction =
+    filteredTransactions.length === 0
+      ? 0
+      : (currentHistoryPage - 1) * historyPageSize + 1;
+  const lastVisibleTransaction = Math.min(
+    currentHistoryPage * historyPageSize,
+    filteredTransactions.length,
+  );
+  const pageNumberStart = Math.max(1, currentHistoryPage - 2);
+  const pageNumberEnd = Math.min(historyPageCount, pageNumberStart + 4);
+  const visiblePageNumbers = Array.from(
+    { length: pageNumberEnd - pageNumberStart + 1 },
+    (_, index) => pageNumberStart + index,
+  );
   const savedTotalExpenses = filteredTransactions
     .filter((transaction) => transaction.type === "EXPENSE")
     .reduce((total, transaction) => total + Number(transaction.amount), 0);
@@ -1210,6 +1318,30 @@ export default function DashboardPage() {
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+        {managementNotice && (
+          <div
+            aria-live="polite"
+            className="fixed right-4 top-4 z-[70] flex max-w-sm items-start gap-3 rounded-xl border border-emerald-500/30 bg-slate-900 px-4 py-3 text-sm text-emerald-200 shadow-2xl shadow-black/40"
+            role="status"
+          >
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
+              <svg
+                aria-hidden="true"
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="m5 12 4 4L19 6" />
+              </svg>
+            </span>
+            <span>{managementNotice}</span>
+          </div>
+        )}
+
         <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-medium text-emerald-400">Resumen</p>
@@ -1220,27 +1352,40 @@ export default function DashboardPage() {
               Administra y revisa tu información financiera desde un solo lugar.
             </p>
           </div>
-          <label className="block w-full sm:max-w-xs">
-            <span className="mb-1.5 block text-xs font-medium text-slate-400">
-              Período financiero
-            </span>
-            <select
-              className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-              onChange={(event) => setSelectedMonth(event.target.value)}
-              value={selectedMonth}
+          <div className="flex w-full flex-col gap-3 sm:max-w-xs">
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-medium text-slate-400">
+                Período financiero
+              </span>
+              <select
+                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                onChange={(event) => {
+                  setSelectedMonth(event.target.value);
+                  setHistoryPage(1);
+                }}
+                value={selectedMonth}
+              >
+                <option value="Todos">Todos los tiempos</option>
+                {availableMonths.map((month) => (
+                  <option key={month} value={month}>
+                    {new Intl.DateTimeFormat("es-CL", {
+                      month: "long",
+                      year: "numeric",
+                      timeZone: "UTC",
+                    }).format(new Date(`${month}-01T00:00:00Z`))}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="self-start rounded-lg border border-rose-500/20 px-3 py-2 text-xs font-medium text-rose-300/80 transition hover:border-rose-500/50 hover:bg-rose-500/5 hover:text-rose-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-50 sm:self-end"
+              disabled={isClearingSandbox || savedTransactions.length === 0}
+              onClick={() => setIsSandboxConfirmOpen(true)}
+              type="button"
             >
-              <option value="Todos">Todos los tiempos</option>
-              {availableMonths.map((month) => (
-                <option key={month} value={month}>
-                  {new Intl.DateTimeFormat("es-CL", {
-                    month: "long",
-                    year: "numeric",
-                    timeZone: "UTC",
-                  }).format(new Date(`${month}-01T00:00:00Z`))}
-                </option>
-              ))}
-            </select>
-          </label>
+              Borrar datos de prueba
+            </button>
+          </div>
         </div>
 
         {errorMsg && (
@@ -1765,16 +1910,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {managementNotice && (
-            <p
-              aria-live="polite"
-              className="mb-5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"
-              role="status"
-            >
-              {managementNotice}
-            </p>
-          )}
-
           {historyError && (
             <p
               aria-live="polite"
@@ -1806,13 +1941,7 @@ export default function DashboardPage() {
           )}
 
           {isLoadingHistory ? (
-            <div
-              aria-label="Cargando historial"
-              className="flex min-h-40 items-center justify-center"
-              role="status"
-            >
-              <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-700 border-t-emerald-500" />
-            </div>
+            <HistorySkeletons />
           ) : !historyError && savedTransactions.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/40 px-5 py-12 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-400">
@@ -1860,6 +1989,7 @@ export default function DashboardPage() {
                       setSelectedType("Todos");
                       setSelectedMonth("Todos");
                       setSearchQuery("");
+                      setHistoryPage(1);
                     }}
                     type="button"
                   >
@@ -1875,7 +2005,10 @@ export default function DashboardPage() {
                     <select
                       className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                       onChange={(event) =>
-                        setSelectedCategory(event.target.value)
+                        {
+                          setSelectedCategory(event.target.value);
+                          setHistoryPage(1);
+                        }
                       }
                       value={selectedCategory}
                     >
@@ -1894,7 +2027,10 @@ export default function DashboardPage() {
                     </span>
                     <select
                       className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                      onChange={(event) => setSelectedType(event.target.value)}
+                      onChange={(event) => {
+                        setSelectedType(event.target.value);
+                        setHistoryPage(1);
+                      }}
                       value={selectedType}
                     >
                       <option value="Todos">Todos</option>
@@ -1909,7 +2045,10 @@ export default function DashboardPage() {
                     </span>
                     <input
                       className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                      onChange={(event) => setSearchQuery(event.target.value)}
+                      onChange={(event) => {
+                        setSearchQuery(event.target.value);
+                        setHistoryPage(1);
+                      }}
                       placeholder="Ej. supermercado"
                       type="search"
                       value={searchQuery}
@@ -1997,7 +2136,7 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 bg-slate-900">
-                    {filteredTransactions.map((transaction, index) => (
+                    {paginatedTransactions.map((transaction, index) => (
                       <tr
                         className="text-slate-300"
                         key={
@@ -2107,6 +2246,60 @@ export default function DashboardPage() {
                   </tbody>
                 </table>
               </div>
+
+              {filteredTransactions.length > 0 && (
+                <nav
+                  aria-label="Paginación del historial"
+                  className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <p className="text-xs text-slate-500">
+                    Mostrando {firstVisibleTransaction}–{lastVisibleTransaction} de{" "}
+                    {filteredTransactions.length} movimientos
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-emerald-500/50 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={currentHistoryPage === 1}
+                      onClick={() =>
+                        setHistoryPage(Math.max(1, currentHistoryPage - 1))
+                      }
+                      type="button"
+                    >
+                      Anterior
+                    </button>
+                    {visiblePageNumbers.map((pageNumber) => (
+                      <button
+                        aria-current={
+                          pageNumber === currentHistoryPage ? "page" : undefined
+                        }
+                        aria-label={`Página ${pageNumber}`}
+                        className={`h-9 min-w-9 rounded-lg border px-3 text-xs font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 ${
+                          pageNumber === currentHistoryPage
+                            ? "border-emerald-500 bg-emerald-500 text-slate-950"
+                            : "border-slate-700 text-slate-300 hover:border-emerald-500/50 hover:text-white"
+                        }`}
+                        key={pageNumber}
+                        onClick={() => setHistoryPage(pageNumber)}
+                        type="button"
+                      >
+                        {pageNumber}
+                      </button>
+                    ))}
+                    <button
+                      className="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-emerald-500/50 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+                      disabled={currentHistoryPage === historyPageCount}
+                      onClick={() =>
+                        setHistoryPage(
+                          Math.min(historyPageCount, currentHistoryPage + 1),
+                        )
+                      }
+                      type="button"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                </nav>
+              )}
             </>
           ) : null}
         </section>
@@ -2307,6 +2500,82 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </form>
+            </section>
+          </div>
+        )}
+
+        {isSandboxConfirmOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !isClearingSandbox) {
+                setIsSandboxConfirmOpen(false);
+              }
+            }}
+          >
+            <section
+              aria-labelledby="sandbox-confirm-title"
+              aria-modal="true"
+              className="w-full max-w-md rounded-2xl border border-rose-500/20 bg-slate-900 p-6 shadow-2xl shadow-black/50 sm:p-7"
+              role="alertdialog"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-300">
+                <svg
+                  aria-hidden="true"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="1.7"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 8v4m0 4h.01M10.3 3.9 2.8 17a2 2 0 0 0 1.7 3h15a2 2 0 0 0 1.7-3l-7.5-13.1a2 2 0 0 0-3.4 0Z" />
+                </svg>
+              </div>
+              <h2
+                className="mt-4 text-lg font-semibold text-white"
+                id="sandbox-confirm-title"
+              >
+                ¿Borrar los datos de prueba?
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Se eliminarán permanentemente las{" "}
+                <span className="font-medium text-slate-200">
+                  {savedTransactions.length} transacciones
+                </span>{" "}
+                de tu cuenta. Esta acción no se puede deshacer y no modificará
+                tus presupuestos.
+              </p>
+
+              {managementError && (
+                <p
+                  aria-live="polite"
+                  className="mt-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+                  role="alert"
+                >
+                  {managementError}
+                </p>
+              )}
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-slate-500 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400 disabled:opacity-50"
+                  disabled={isClearingSandbox}
+                  onClick={() => setIsSandboxConfirmOpen(false)}
+                  type="button"
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="rounded-lg bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-60"
+                  disabled={isClearingSandbox}
+                  onClick={() => void handleClearSandboxData()}
+                  type="button"
+                >
+                  {isClearingSandbox ? "Borrando..." : "Sí, borrar datos"}
+                </button>
+              </div>
             </section>
           </div>
         )}
