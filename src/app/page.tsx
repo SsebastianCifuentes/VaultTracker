@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import SmartLogo from "@/components/SmartLogo";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
@@ -19,7 +20,7 @@ interface Movement {
   id: number;
   merchant: string;
   initial: string;
-  src?: string;
+  domain?: string;
   date: string;
   detail: string;
   amount: number;
@@ -32,7 +33,7 @@ const movements: Movement[] = [
     id: 1,
     merchant: "McDonald's",
     initial: "M",
-    src: "https://logo.clearbit.com/mcdonalds.com",
+    domain: "mcdonalds.com",
     date: "Hoy, 12:42",
     detail: "Restaurante · Tarjeta débito",
     amount: -8990,
@@ -43,7 +44,7 @@ const movements: Movement[] = [
     id: 2,
     merchant: "Starbucks",
     initial: "S",
-    src: "https://logo.clearbit.com/starbucks.com",
+    domain: "starbucks.com",
     date: "Ayer, 09:18",
     detail: "Cafetería · Tarjeta débito",
     amount: -5490,
@@ -54,7 +55,7 @@ const movements: Movement[] = [
     id: 3,
     merchant: "Lider",
     initial: "L",
-    src: "https://logo.clearbit.com/lider.cl",
+    domain: "lider.cl",
     date: "Ayer, 18:07",
     detail: "Supermercado · Tarjeta crédito",
     amount: -62490,
@@ -65,7 +66,7 @@ const movements: Movement[] = [
     id: 4,
     merchant: "Uber",
     initial: "U",
-    src: "https://logo.clearbit.com/uber.com",
+    domain: "uber.com",
     date: "05 nov, 20:31",
     detail: "Transporte · Tarjeta débito",
     amount: -7350,
@@ -93,67 +94,13 @@ const filters: CategoryFilter[] = [
 ];
 
 const banks = [
-  {
-    name: "Santander",
-    initial: "S",
-    src: "https://logo.clearbit.com/santander.cl",
-  },
-  {
-    name: "Banco de Chile",
-    initial: "CH",
-    src: "https://logo.clearbit.com/bancochile.cl",
-  },
-  {
-    name: "BancoEstado",
-    initial: "BE",
-    src: "https://logo.clearbit.com/bancoestado.cl",
-  },
-  { name: "Bci", initial: "B", src: "https://logo.clearbit.com/bci.cl" },
-  {
-    name: "Scotiabank",
-    initial: "S",
-    src: "https://logo.clearbit.com/scotiabankchile.cl",
-  },
-  {
-    name: "Falabella",
-    initial: "F",
-    src: "https://logo.clearbit.com/bancofalabella.cl",
-  },
+  { name: "Santander", domain: "santander.cl" },
+  { name: "Banco de Chile", domain: "bancochile.cl" },
+  { name: "BancoEstado", domain: "bancoestado.cl" },
+  { name: "Bci", domain: "bci.cl" },
+  { name: "Scotiabank", domain: "scotiabankchile.cl" },
+  { name: "Falabella", domain: "bancofalabella.cl" },
 ];
-
-const LogoConFallback = ({
-  src,
-  alt,
-  initial,
-  className,
-}: {
-  src: string;
-  alt: string;
-  initial: string;
-  className: string;
-}) => {
-  const [error, setError] = useState(false);
-
-  if (error) {
-    return (
-      <div
-        className={`flex items-center justify-center bg-slate-100 text-slate-500 font-bold ${className}`}
-      >
-        {initial}
-      </div>
-    );
-  }
-
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      className={`object-cover bg-white ${className}`}
-      onError={() => setError(true)}
-    />
-  );
-};
 
 function BrandMark() {
   return (
@@ -377,10 +324,9 @@ export default function Home() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.06, duration: 0.3 }}
               >
-                <LogoConFallback
-                  src={bank.src}
-                  alt={bank.name}
-                  initial={bank.initial}
+                <SmartLogo
+                  domain={bank.domain}
+                  name={bank.name}
                   className="h-10 w-10 rounded-full border border-slate-200"
                 />
                 <div>
@@ -513,16 +459,15 @@ export default function Home() {
                 whileHover={reduceMotion ? undefined : { x: 3 }}
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  {movement.src ? (
-                    <LogoConFallback
-                      src={movement.src}
-                      alt={
+                  {movement.domain ? (
+                    <SmartLogo
+                      domain={movement.domain}
+                      name={
                         movement.merchant === "McDonald's"
                           ? "McDonalds"
                           : movement.merchant
                       }
-                      initial={movement.initial}
-                      className="h-10 w-10 rounded-full"
+                      className="h-10 w-10 rounded-full border border-slate-100"
                     />
                   ) : (
                     <span
