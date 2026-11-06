@@ -13,6 +13,9 @@ export const TRANSACTION_CATEGORIES = [
   "Transporte",
   "Compras",
   "Pagos",
+  "Vivienda/Gastos Comunes",
+  "Viajes",
+  "Salud",
   "Otros",
 ] as const;
 
@@ -22,6 +25,41 @@ export function assignAutoCategory(description: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
   const categoryKeywords: Array<[string, string[]]> = [
+    [
+      "Viajes",
+      [
+        "AIR CANADA",
+        "LATAM",
+        "SKY",
+        "HOTEL",
+        "BOOKING",
+        "AIRBNB",
+        "IMMIGRATION",
+      ],
+    ],
+    [
+      "Vivienda/Gastos Comunes",
+      [
+        "ARRIENDO",
+        "GASTO COMUN",
+        "LIPIAPP",
+        "ENEL",
+        "CHILQUINTA",
+        "ESVAL",
+        "AGUAS",
+      ],
+    ],
+    [
+      "Salud",
+      [
+        "AHUMADA",
+        "CRUZ VERDE",
+        "SALCOBRAND",
+        "DOCTOR",
+        "CLINICA",
+        "PUNTO DE ALIVIO",
+      ],
+    ],
     ["Ocio", ["Cinemark", "Ticketmaster", "Steam", "Juegos"]],
     [
       "Restaurantes",

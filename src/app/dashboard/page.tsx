@@ -3,6 +3,14 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
+import {
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+} from "recharts";
 import {
   assignAutoCategory,
   parseBankCSV,
@@ -14,6 +22,64 @@ import {
 interface SavedTransaction extends TransactionItem {
   id?: string | number;
 }
+
+interface ManualTransactionForm {
+  date: string;
+  description: string;
+  amount: string;
+  type: TransactionItem["type"];
+  category: (typeof TRANSACTION_CATEGORIES)[number];
+}
+
+interface BudgetRecord {
+  category: string;
+  monthly_limit: number;
+}
+
+const BUDGET_CATEGORIES = [
+  "Ocio",
+  "Restaurantes",
+  "Supermercado",
+  "Transporte",
+  "Viajes",
+] as const;
+
+function getLocalDateString() {
+  const date = new Date();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function getLocalMonthString() {
+  return getLocalDateString().slice(0, 7);
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Ocio: "#a78bfa",
+  Restaurantes: "#fb7185",
+  Supermercado: "#34d399",
+  Transporte: "#22d3ee",
+  Compras: "#fbbf24",
+  Pagos: "#818cf8",
+  "Vivienda/Gastos Comunes": "#f97316",
+  Viajes: "#2dd4bf",
+  Salud: "#f472b6",
+  Otros: "#94a3b8",
+};
+
+const FILTER_CATEGORIES = [
+  "Viajes",
+  "Vivienda/Gastos Comunes",
+  "Salud",
+  "Ocio",
+  "Restaurantes",
+  "Supermercado",
+  "Transporte",
+  "Compras",
+  "Pagos",
+  "Otros",
+] as const;
 
 function isTransactionCategory(
   category: unknown,
@@ -63,6 +129,163 @@ function CategorySpendingBreakdown({
   );
 }
 
+function SavedExpenseInsights({
+  transactions,
+  formatCurrency,
+}: {
+  transactions: Pick<TransactionItem, "amount" | "category" | "type">[];
+  formatCurrency: (amount: number) => string;
+}) {
+  const expenseDistribution = useMemo(
+    () =>
+      TRANSACTION_CATEGORIES.map((category) => ({
+        category,
+        amount: transactions
+          .filter(
+            (transaction) =>
+              transaction.type === "EXPENSE" &&
+              transaction.category === category,
+          )
+          .reduce((total, transaction) => total + Number(transaction.amount), 0),
+        fill: CATEGORY_COLORS[category],
+      }))
+        .filter((entry) => entry.amount > 0)
+        .sort((left, right) => right.amount - left.amount),
+    [transactions],
+  );
+  const totalExpenses = expenseDistribution.reduce(
+    (total, entry) => total + entry.amount,
+    0,
+  );
+  const topCategories = expenseDistribution.slice(0, 3);
+
+  return (
+    <div className="mb-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+      <section
+        aria-labelledby="expense-chart-title"
+        className="rounded-xl border border-slate-800 bg-slate-950/60 p-5 sm:p-6"
+      >
+        <div>
+          <h3
+            className="text-sm font-semibold text-white"
+            id="expense-chart-title"
+          >
+            Distribución de gastos
+          </h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Gastos guardados agrupados por categoría
+          </p>
+        </div>
+
+        {totalExpenses > 0 ? (
+          <div className="mt-3 grid items-center gap-3 sm:grid-cols-[minmax(0,1.1fr)_minmax(10rem,0.9fr)]">
+            <div className="h-56 min-w-0">
+              <ResponsiveContainer height="100%" width="100%">
+                <PieChart>
+                  <Pie
+                    data={expenseDistribution}
+                    dataKey="amount"
+                    innerRadius="58%"
+                    nameKey="category"
+                    outerRadius="84%"
+                    paddingAngle={3}
+                    stroke="none"
+                  >
+                    {expenseDistribution.map((entry) => (
+                      <Cell fill={entry.fill} key={entry.category} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "0.75rem",
+                      color: "#e2e8f0",
+                    }}
+                    formatter={(value, name) => [
+                      formatCurrency(Number(value)),
+                      String(name),
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <ul className="space-y-2.5">
+              {expenseDistribution.map((entry) => (
+                <li
+                  className="flex items-center justify-between gap-3 text-xs"
+                  key={entry.category}
+                >
+                  <span className="flex min-w-0 items-center gap-2 text-slate-300">
+                    <span
+                      aria-hidden="true"
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: entry.fill }}
+                    />
+                    <span className="truncate">{entry.category}</span>
+                  </span>
+                  <span className="shrink-0 text-slate-500">
+                    {((entry.amount / totalExpenses) * 100).toFixed(0)}%
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="flex h-56 items-center justify-center text-center text-sm text-slate-500">
+            Aún no hay gastos guardados para mostrar.
+          </div>
+        )}
+      </section>
+
+      <section
+        aria-labelledby="top-expenses-title"
+        className="rounded-xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/[0.08] to-slate-950/80 p-5 sm:p-6"
+      >
+        <p className="text-xs font-medium uppercase tracking-wide text-emerald-300">
+          Tus principales rubros
+        </p>
+        <h3
+          className="mt-2 text-lg font-semibold text-white"
+          id="top-expenses-title"
+        >
+          Donde más gastas
+        </h3>
+        <p className="mt-1 text-xs text-slate-500">
+          Las tres categorías con mayor gasto acumulado.
+        </p>
+
+        {topCategories.length > 0 ? (
+          <ol className="mt-5 space-y-3">
+            {topCategories.map((entry, index) => (
+              <li
+                className="flex items-center justify-between gap-3 rounded-lg border border-slate-800/80 bg-slate-950/60 p-3"
+                key={entry.category}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-300">
+                    {index + 1}
+                  </span>
+                  <span className="truncate text-sm font-medium text-slate-200">
+                    {entry.category}
+                  </span>
+                </span>
+                <span className="shrink-0 text-sm font-semibold text-white">
+                  {formatCurrency(entry.amount)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="mt-5 rounded-lg border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-500">
+            Cuando guardes gastos, aquí verás tus principales rubros.
+          </p>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -73,13 +296,39 @@ export default function DashboardPage() {
   const [savedTransactions, setSavedTransactions] = useState<
     SavedTransaction[]
   >([]);
+  const [budgets, setBudgets] = useState<BudgetRecord[]>([]);
+  const [budgetDrafts, setBudgetDrafts] = useState<Record<string, string>>({});
+  const [isLoadingBudgets, setIsLoadingBudgets] = useState(true);
+  const [budgetError, setBudgetError] = useState("");
+  const [savingBudgetCategory, setSavingBudgetCategory] = useState<
+    string | null
+  >(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [historyError, setHistoryError] = useState("");
   const [categoryError, setCategoryError] = useState("");
-  const [historySearch, setHistorySearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("Todas");
+  const [selectedType, setSelectedType] = useState("Todos");
+  const [selectedMonth, setSelectedMonth] = useState("Todos");
+  const [searchQuery, setSearchQuery] = useState("");
   const [savingCategoryId, setSavingCategoryId] = useState<
     string | number | null
   >(null);
+  const [deletingTransactionId, setDeletingTransactionId] = useState<
+    string | number | null
+  >(null);
+  const [managementError, setManagementError] = useState("");
+  const [managementNotice, setManagementNotice] = useState("");
+  const [isManualFormOpen, setIsManualFormOpen] = useState(false);
+  const [isSavingManual, setIsSavingManual] = useState(false);
+  const [manualFormError, setManualFormError] = useState("");
+  const [manualTransaction, setManualTransaction] =
+    useState<ManualTransactionForm>({
+      date: "",
+      description: "",
+      amount: "",
+      type: "EXPENSE",
+      category: "Otros",
+    });
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [fileError, setFileError] = useState("");
@@ -93,6 +342,16 @@ export default function DashboardPage() {
     TransactionItem[]
   >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (noticeTimeoutRef.current) {
+        clearTimeout(noticeTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const supabase = useMemo(() => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -131,6 +390,26 @@ export default function DashboardPage() {
     [supabase],
   );
 
+  const fetchBudgets = useCallback(
+    async (currentUserId: string) => {
+      if (!supabase) {
+        throw new Error("Falta configurar la conexión con Supabase.");
+      }
+
+      const { data, error } = await supabase
+        .from("budgets")
+        .select("category, monthly_limit")
+        .eq("user_id", currentUserId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return (data ?? []) as BudgetRecord[];
+    },
+    [supabase],
+  );
+
   useEffect(() => {
     let active = true;
 
@@ -157,6 +436,7 @@ export default function DashboardPage() {
           return;
         }
 
+        setSelectedMonth(getLocalMonthString());
         setUserId(data.user.id);
         setUserEmail(data.user.email ?? null);
         setLoading(false);
@@ -214,6 +494,49 @@ export default function DashboardPage() {
     };
   }, [fetchSavedTransactions, userId]);
 
+  useEffect(() => {
+    if (!userId) return;
+
+    const currentUserId = userId;
+    let active = true;
+
+    async function loadBudgets() {
+      try {
+        const loadedBudgets = await fetchBudgets(currentUserId);
+        if (!active) return;
+
+        setBudgets(loadedBudgets);
+        setBudgetDrafts(
+          Object.fromEntries(
+            loadedBudgets.map((budget) => [
+              budget.category,
+              String(budget.monthly_limit),
+            ]),
+          ),
+        );
+        setBudgetError("");
+      } catch (error) {
+        if (!active) return;
+
+        setBudgetError(
+          error instanceof Error
+            ? `No se pudieron cargar los presupuestos: ${error.message}`
+            : "Ocurrió un error inesperado al cargar los presupuestos.",
+        );
+      } finally {
+        if (active) {
+          setIsLoadingBudgets(false);
+        }
+      }
+    }
+
+    void loadBudgets();
+
+    return () => {
+      active = false;
+    };
+  }, [fetchBudgets, userId]);
+
   async function handleLogout() {
     if (!supabase) {
       setErrorMsg("Falta configurar la conexión con Supabase.");
@@ -264,7 +587,9 @@ export default function DashboardPage() {
         .from("transactions")
         .update({ category })
         .eq("id", transaction.id)
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .select("id")
+        .single();
 
       if (error) {
         setCategoryError(
@@ -290,6 +615,228 @@ export default function DashboardPage() {
     } finally {
       setSavingCategoryId(null);
     }
+  }
+
+  function showManagementNotice(message: string) {
+    setManagementNotice(message);
+
+    if (noticeTimeoutRef.current) {
+      clearTimeout(noticeTimeoutRef.current);
+    }
+
+    noticeTimeoutRef.current = setTimeout(() => {
+      setManagementNotice("");
+      noticeTimeoutRef.current = null;
+    }, 3500);
+  }
+
+  async function handleSaveBudget(category: string) {
+    if (!supabase || !userId) {
+      setBudgetError(
+        "No se pudo verificar tu sesión para guardar el presupuesto.",
+      );
+      return;
+    }
+
+    const monthlyLimit = Number(budgetDrafts[category]);
+    if (!Number.isFinite(monthlyLimit) || monthlyLimit <= 0) {
+      setBudgetError("Ingresa un límite mensual mayor que cero.");
+      return;
+    }
+
+    setSavingBudgetCategory(category);
+    setBudgetError("");
+
+    try {
+      const { data, error } = await supabase
+        .from("budgets")
+        .upsert(
+          {
+            user_id: userId,
+            category,
+            monthly_limit: monthlyLimit,
+          },
+          { onConflict: "user_id,category" },
+        )
+        .select("category, monthly_limit")
+        .single();
+
+      if (error) {
+        setBudgetError(`No se pudo guardar el presupuesto: ${error.message}`);
+        return;
+      }
+
+      const savedBudget = data as BudgetRecord;
+      setBudgets((currentBudgets) => [
+        ...currentBudgets.filter(
+          (budget) => budget.category !== savedBudget.category,
+        ),
+        savedBudget,
+      ]);
+      setBudgetDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [category]: String(savedBudget.monthly_limit),
+      }));
+      showManagementNotice(`Presupuesto de ${category} guardado.`);
+    } catch (error) {
+      setBudgetError(
+        error instanceof Error
+          ? `No se pudo guardar el presupuesto: ${error.message}`
+          : "Ocurrió un error inesperado al guardar el presupuesto.",
+      );
+    } finally {
+      setSavingBudgetCategory(null);
+    }
+  }
+
+  async function handleDeleteTransaction(transaction: SavedTransaction) {
+    if (!supabase || !userId || transaction.id === undefined) {
+      setManagementError(
+        "No se pudo eliminar este movimiento: faltan datos de la sesión.",
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `¿Quieres eliminar el movimiento "${transaction.description}"?`,
+    );
+    if (!confirmed) return;
+
+    setDeletingTransactionId(transaction.id);
+    setManagementError("");
+
+    try {
+      const { error } = await supabase
+        .from("transactions")
+        .delete()
+        .eq("id", transaction.id)
+        .eq("user_id", userId)
+        .select("id")
+        .single();
+
+      if (error) {
+        setManagementError(
+          `No se pudo eliminar el movimiento: ${error.message}`,
+        );
+        return;
+      }
+
+      setSavedTransactions((currentTransactions) =>
+        currentTransactions.filter(
+          (savedTransaction) => savedTransaction.id !== transaction.id,
+        ),
+      );
+      showManagementNotice("Movimiento eliminado correctamente.");
+    } catch (error) {
+      setManagementError(
+        error instanceof Error
+          ? `No se pudo eliminar el movimiento: ${error.message}`
+          : "Ocurrió un error inesperado al eliminar el movimiento.",
+      );
+    } finally {
+      setDeletingTransactionId(null);
+    }
+  }
+
+  async function handleManualTransactionSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!supabase || !userId) {
+      setManualFormError(
+        "No se pudo verificar tu sesión. Inicia sesión nuevamente.",
+      );
+      return;
+    }
+
+    const amount = Number(manualTransaction.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setManualFormError("Ingresa un monto mayor que cero.");
+      return;
+    }
+
+    setIsSavingManual(true);
+    setManualFormError("");
+    setManagementError("");
+
+    try {
+      const { data: insertedTransaction, error } = await supabase
+        .from("transactions")
+        .insert({
+          date: manualTransaction.date,
+          description: manualTransaction.description.trim(),
+          amount,
+          type: manualTransaction.type,
+          category: manualTransaction.category,
+          user_id: userId,
+        })
+        .select("*")
+        .single();
+
+      if (error) {
+        setManualFormError(
+          `No se pudo guardar el movimiento: ${error.message}`,
+        );
+        return;
+      }
+
+      if (!insertedTransaction) {
+        setManualFormError(
+          "El movimiento se insertó, pero no se pudo recuperar el registro creado.",
+        );
+        return;
+      }
+
+      const insertedSavedTransaction = {
+        ...insertedTransaction,
+        category: isTransactionCategory(insertedTransaction.category)
+          ? insertedTransaction.category
+          : manualTransaction.category,
+      } as SavedTransaction;
+      setSavedTransactions((currentTransactions) =>
+        [insertedSavedTransaction, ...currentTransactions].sort((left, right) =>
+          right.date.localeCompare(left.date),
+        ),
+      );
+      try {
+        const transactions = await fetchSavedTransactions(userId);
+        setSavedTransactions(transactions);
+        setHistoryError("");
+      } catch (error) {
+        setManagementError(
+          error instanceof Error
+            ? `El movimiento se guardó, pero no se pudo actualizar el historial: ${error.message}`
+            : "El movimiento se guardó, pero no se pudo actualizar el historial.",
+        );
+      }
+      setIsManualFormOpen(false);
+      setManualTransaction({
+        date: "",
+        description: "",
+        amount: "",
+        type: "EXPENSE",
+        category: "Otros",
+      });
+      showManagementNotice("Movimiento guardado correctamente.");
+    } catch (error) {
+      setManualFormError(
+        error instanceof Error
+          ? `No se pudo guardar el movimiento: ${error.message}`
+          : "Ocurrió un error inesperado al guardar el movimiento.",
+      );
+    } finally {
+      setIsSavingManual(false);
+    }
+  }
+
+  function openManualTransactionForm() {
+    setManualFormError("");
+    setManualTransaction((currentTransaction) => ({
+      ...currentTransaction,
+      date: getLocalDateString(),
+    }));
+    setIsManualFormOpen(true);
   }
 
   async function handleSaveToDatabase() {
@@ -326,19 +873,87 @@ export default function DashboardPage() {
         return;
       }
 
-      const dataToInsert = parsedTransactions.map((transaction) => ({
-        ...transaction,
-        category: transaction.category,
-        user_id: data.user.id,
-      }));
-      const { error: insertError } = await supabase
-        .from("transactions")
-        .insert(dataToInsert);
+      const sortedDates = parsedTransactions
+        .map((transaction) => transaction.date)
+        .sort();
+      const existingRows: Array<{
+        date: string;
+        description: string;
+        amount: number | string;
+      }> = [];
+      let rangeStart = 0;
+      let hasMoreRows = true;
 
-      if (insertError) {
+      while (hasMoreRows) {
+        const { data: existingPage, error: existingError } = await supabase
+          .from("transactions")
+          .select("date, description, amount")
+          .eq("user_id", data.user.id)
+          .gte("date", sortedDates[0])
+          .lte("date", sortedDates[sortedDates.length - 1])
+          .range(rangeStart, rangeStart + 999);
+
+        if (existingError) {
+          setSaveMessage({
+            type: "error",
+            text: `No se pudieron comprobar los duplicados: ${existingError.message}`,
+          });
+          return;
+        }
+
+        const page = existingPage ?? [];
+        existingRows.push(
+          ...(page as Array<{
+            date: string;
+            description: string;
+            amount: number | string;
+          }>),
+        );
+        hasMoreRows = page.length === 1000;
+        rangeStart += page.length;
+      }
+
+      const transactionKey = (transaction: {
+        date: string;
+        description: string;
+        amount: number | string;
+      }) =>
+        JSON.stringify([
+          transaction.date,
+          transaction.description,
+          Number(transaction.amount),
+        ]);
+      const knownTransactions = new Set(existingRows.map(transactionKey));
+      let duplicateCount = 0;
+      const dataToInsert = parsedTransactions.flatMap((transaction) => {
+        const key = transactionKey(transaction);
+        if (knownTransactions.has(key)) {
+          duplicateCount += 1;
+          return [];
+        }
+
+        knownTransactions.add(key);
+        return [{ ...transaction, user_id: data.user.id }];
+      });
+
+      if (dataToInsert.length > 0) {
+        const { error: insertError } = await supabase
+          .from("transactions")
+          .insert(dataToInsert);
+
+        if (insertError) {
+          setSaveMessage({
+            type: "error",
+            text: `No se pudieron guardar las transacciones: ${insertError.message}`,
+          });
+          return;
+        }
+      }
+
+      if (dataToInsert.length === 0 && duplicateCount === 0) {
         setSaveMessage({
           type: "error",
-          text: `No se pudieron guardar las transacciones: ${insertError.message}`,
+          text: "No se encontraron transacciones para guardar.",
         });
         return;
       }
@@ -366,8 +981,12 @@ export default function DashboardPage() {
       setSaveMessage({
         type: "success",
         text: `${dataToInsert.length} ${
-          dataToInsert.length === 1 ? "transacción guardada" : "transacciones guardadas"
-        } correctamente en tu cuenta.`,
+          dataToInsert.length === 1 ? "transacción nueva guardada" : "transacciones nuevas guardadas"
+        }, ${duplicateCount} ${
+          duplicateCount === 1
+            ? "ignorada por duplicación."
+            : "ignoradas por duplicación."
+        }`,
       });
     } catch (error) {
       setSaveMessage({
@@ -461,18 +1080,51 @@ export default function DashboardPage() {
     .filter((transaction) => transaction.type === "INCOME")
     .reduce((total, transaction) => total + transaction.amount, 0);
   const netBalance = totalIncome - totalExpenses;
-  const savedTotalExpenses = savedTransactions
+  const availableMonths = Array.from(
+    new Set(
+      [
+        ...savedTransactions
+          .map((transaction) => transaction.date.slice(0, 7))
+          .filter((month) => /^\d{4}-\d{2}$/.test(month)),
+        ...(selectedMonth === "Todos" ? [] : [selectedMonth]),
+      ],
+    ),
+  ).sort((left, right) => right.localeCompare(left));
+  const selectedPeriodTransactions =
+    selectedMonth === "Todos"
+      ? savedTransactions
+      : savedTransactions.filter(
+          (transaction) => transaction.date.slice(0, 7) === selectedMonth,
+        );
+  const monthlySpending = selectedPeriodTransactions
+    .filter((transaction) => transaction.type === "EXPENSE")
+    .reduce<Record<string, number>>((totals, transaction) => {
+      totals[transaction.category] =
+        (totals[transaction.category] ?? 0) + Number(transaction.amount);
+      return totals;
+    }, {});
+  const filteredTransactions = savedTransactions.filter((transaction) => {
+    const matchesCategory =
+      selectedCategory === "Todas" ||
+      transaction.category === selectedCategory;
+    const matchesType =
+      selectedType === "Todos" || transaction.type === selectedType;
+    const matchesMonth =
+      selectedMonth === "Todos" ||
+      transaction.date.slice(0, 7) === selectedMonth;
+    const matchesSearch = transaction.description
+      .toLocaleLowerCase("es")
+      .includes(searchQuery.trim().toLocaleLowerCase("es"));
+
+    return matchesCategory && matchesType && matchesMonth && matchesSearch;
+  });
+  const savedTotalExpenses = filteredTransactions
     .filter((transaction) => transaction.type === "EXPENSE")
     .reduce((total, transaction) => total + Number(transaction.amount), 0);
-  const savedTotalIncome = savedTransactions
+  const savedTotalIncome = filteredTransactions
     .filter((transaction) => transaction.type === "INCOME")
     .reduce((total, transaction) => total + Number(transaction.amount), 0);
   const savedNetBalance = savedTotalIncome - savedTotalExpenses;
-  const filteredSavedTransactions = savedTransactions.filter((transaction) =>
-    transaction.description
-      .toLocaleLowerCase("es")
-      .includes(historySearch.trim().toLocaleLowerCase("es")),
-  );
 
   if (loading) {
     return (
@@ -558,14 +1210,37 @@ export default function DashboardPage() {
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-        <div className="mb-8">
-          <p className="text-sm font-medium text-emerald-400">Resumen</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
-            Tu espacio financiero
-          </h1>
-          <p className="mt-2 text-sm text-slate-400">
-            Administra y revisa tu información financiera desde un solo lugar.
-          </p>
+        <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-emerald-400">Resumen</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
+              Tu espacio financiero
+            </h1>
+            <p className="mt-2 text-sm text-slate-400">
+              Administra y revisa tu información financiera desde un solo lugar.
+            </p>
+          </div>
+          <label className="block w-full sm:max-w-xs">
+            <span className="mb-1.5 block text-xs font-medium text-slate-400">
+              Período financiero
+            </span>
+            <select
+              className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              onChange={(event) => setSelectedMonth(event.target.value)}
+              value={selectedMonth}
+            >
+              <option value="Todos">Todos los tiempos</option>
+              {availableMonths.map((month) => (
+                <option key={month} value={month}>
+                  {new Intl.DateTimeFormat("es-CL", {
+                    month: "long",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  }).format(new Date(`${month}-01T00:00:00Z`))}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {errorMsg && (
@@ -882,6 +1557,166 @@ export default function DashboardPage() {
         </section>
 
         <section
+          aria-labelledby="budgets-title"
+          className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl shadow-black/20 sm:p-8"
+        >
+          <div className="mb-6">
+            <p className="text-sm font-medium text-emerald-400">
+              Planifica tus gastos
+            </p>
+            <h2
+              className="mt-1 text-xl font-semibold text-white"
+              id="budgets-title"
+            >
+              Presupuestos Mensuales
+            </h2>
+            <p className="mt-2 text-sm text-slate-400">
+              Define límites para tus categorías principales y monitorea el
+              gasto del período seleccionado.
+            </p>
+          </div>
+
+          {budgetError && (
+            <p
+              aria-live="polite"
+              className="mb-5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+              role="alert"
+            >
+              {budgetError}
+            </p>
+          )}
+
+          {isLoadingBudgets ? (
+            <div
+              aria-label="Cargando presupuestos"
+              className="flex min-h-32 items-center justify-center"
+              role="status"
+            >
+              <div className="h-7 w-7 animate-spin rounded-full border-2 border-slate-700 border-t-emerald-500" />
+            </div>
+          ) : (
+            <>
+              {selectedMonth === "Todos" && (
+                <p className="mb-5 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
+                  Selecciona un mes en el período financiero para ver el
+                  progreso mensual. Los límites se pueden editar en cualquier
+                  período.
+                </p>
+              )}
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                {BUDGET_CATEGORIES.map((category) => {
+                  const budget = budgets.find(
+                    (savedBudget) => savedBudget.category === category,
+                  );
+                  const monthlyLimit = Number(budget?.monthly_limit ?? 0);
+                  const spent = monthlySpending[category] ?? 0;
+                  const ratio =
+                    monthlyLimit > 0 ? (spent / monthlyLimit) * 100 : 0;
+                  const progressColor =
+                    ratio < 75
+                      ? "bg-emerald-400"
+                      : ratio <= 95
+                        ? "bg-amber-400"
+                        : "bg-rose-400";
+                  const progressTextColor =
+                    ratio < 75
+                      ? "text-emerald-300"
+                      : ratio <= 95
+                        ? "text-amber-300"
+                        : "text-rose-300";
+
+                  return (
+                    <article
+                      className="rounded-xl border border-slate-800 bg-slate-950/60 p-4"
+                      key={category}
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <label
+                            className="mb-1.5 block text-sm font-medium text-slate-200"
+                            htmlFor={`budget-${category}`}
+                          >
+                            {category}
+                          </label>
+                          <div className="flex">
+                            <span className="inline-flex items-center rounded-l-lg border border-r-0 border-slate-700 bg-slate-900 px-3 text-sm text-slate-500">
+                              $
+                            </span>
+                            <input
+                              className="min-w-0 flex-1 rounded-r-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                              id={`budget-${category}`}
+                              min="1"
+                              onChange={(event) =>
+                                setBudgetDrafts((currentDrafts) => ({
+                                  ...currentDrafts,
+                                  [category]: event.target.value,
+                                }))
+                              }
+                              placeholder="Límite mensual"
+                              step="1"
+                              type="number"
+                              value={
+                                budgetDrafts[category] ??
+                                (budget ? String(budget.monthly_limit) : "")
+                              }
+                            />
+                          </div>
+                        </div>
+                        <button
+                          className="rounded-lg border border-emerald-500/30 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:border-emerald-400/60 hover:bg-emerald-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-wait disabled:opacity-50"
+                          disabled={
+                            savingBudgetCategory !== null ||
+                            !budgetDrafts[category]
+                          }
+                          onClick={() => void handleSaveBudget(category)}
+                          type="button"
+                        >
+                          {savingBudgetCategory === category
+                            ? "Guardando..."
+                            : budget
+                              ? "Actualizar"
+                              : "Guardar"}
+                        </button>
+                      </div>
+
+                      {budget && selectedMonth !== "Todos" && (
+                        <div className="mt-4">
+                          <div className="mb-2 flex items-center justify-between gap-3 text-xs">
+                            <span className="text-slate-400">
+                              Gastado: {formatCurrency(spent)} de{" "}
+                              {formatCurrency(monthlyLimit)}
+                            </span>
+                            <span
+                              className={`font-semibold ${progressTextColor}`}
+                            >
+                              {ratio.toFixed(0)}%
+                            </span>
+                          </div>
+                          <div
+                            aria-label={`${category}: ${ratio.toFixed(0)}% del presupuesto utilizado`}
+                            aria-valuemax={100}
+                            aria-valuemin={0}
+                            aria-valuenow={Math.min(ratio, 100)}
+                            className="h-2.5 overflow-hidden rounded-full bg-slate-800"
+                            role="progressbar"
+                          >
+                            <div
+                              className={`h-full rounded-full transition-all ${progressColor}`}
+                              style={{ width: `${Math.min(ratio, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </section>
+
+        <section
           aria-labelledby="history-title"
           className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-xl shadow-black/20 sm:p-10"
         >
@@ -900,15 +1735,45 @@ export default function DashboardPage() {
                 Consulta las transacciones guardadas en tu cuenta.
               </p>
             </div>
-            {savedTransactions.length > 0 && (
-              <p className="text-xs text-slate-500">
-                {savedTransactions.length}{" "}
-                {savedTransactions.length === 1
-                  ? "movimiento guardado"
-                  : "movimientos guardados"}
-              </p>
-            )}
+            <div className="flex flex-col gap-3 sm:items-end">
+              {savedTransactions.length > 0 && (
+                <p className="text-xs text-slate-500">
+                  {savedTransactions.length}{" "}
+                  {savedTransactions.length === 1
+                    ? "movimiento guardado"
+                    : "movimientos guardados"}
+                </p>
+              )}
+              <button
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+                onClick={openManualTransactionForm}
+                type="button"
+              >
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeLinecap="round"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Agregar Movimiento Manual
+              </button>
+            </div>
           </div>
+
+          {managementNotice && (
+            <p
+              aria-live="polite"
+              className="mb-5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300"
+              role="status"
+            >
+              {managementNotice}
+            </p>
+          )}
 
           {historyError && (
             <p
@@ -927,6 +1792,16 @@ export default function DashboardPage() {
               role="alert"
             >
               {categoryError}
+            </p>
+          )}
+
+          {managementError && (
+            <p
+              aria-live="polite"
+              className="mb-5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+              role="alert"
+            >
+              {managementError}
             </p>
           )}
 
@@ -965,6 +1840,94 @@ export default function DashboardPage() {
             </div>
           ) : !historyError ? (
             <>
+              <section
+                aria-label="Filtros de transacciones"
+                className="mb-6 rounded-xl border border-slate-800 bg-slate-950/60 p-4 sm:p-5"
+              >
+                <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">
+                      Filtrar movimientos
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Los resúmenes y gráficos se actualizan con los resultados.
+                    </p>
+                  </div>
+                  <button
+                    className="self-start text-xs font-medium text-emerald-300 transition hover:text-emerald-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 sm:self-auto"
+                    onClick={() => {
+                      setSelectedCategory("Todas");
+                      setSelectedType("Todos");
+                      setSelectedMonth("Todos");
+                      setSearchQuery("");
+                    }}
+                    type="button"
+                  >
+                    Limpiar filtros
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-slate-400">
+                      Categoría
+                    </span>
+                    <select
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      onChange={(event) =>
+                        setSelectedCategory(event.target.value)
+                      }
+                      value={selectedCategory}
+                    >
+                      <option value="Todas">Todas</option>
+                      {FILTER_CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-slate-400">
+                      Tipo
+                    </span>
+                    <select
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      onChange={(event) => setSelectedType(event.target.value)}
+                      value={selectedType}
+                    >
+                      <option value="Todos">Todos</option>
+                      <option value="INCOME">Ingresos</option>
+                      <option value="EXPENSE">Gastos</option>
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-slate-400">
+                      Buscar descripción
+                    </span>
+                    <input
+                      className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="Ej. supermercado"
+                      type="search"
+                      value={searchQuery}
+                    />
+                  </label>
+                </div>
+                <p
+                  aria-live="polite"
+                  className="mt-3 text-xs text-slate-500"
+                  role="status"
+                >
+                  {filteredTransactions.length}{" "}
+                  {filteredTransactions.length === 1
+                    ? "movimiento coincide"
+                    : "movimientos coinciden"}
+                </p>
+              </section>
+
               <div className="mb-6 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-rose-500/20 bg-rose-500/5 p-4">
                   <p className="text-xs font-medium text-rose-300">
@@ -998,36 +1961,13 @@ export default function DashboardPage() {
 
               <CategorySpendingBreakdown
                 formatCurrency={formatCurrency}
-                transactions={savedTransactions}
+                transactions={filteredTransactions}
               />
 
-              <label className="mb-4 block">
-                <span className="sr-only">
-                  Buscar transacción por descripción
-                </span>
-                <span className="relative block">
-                  <svg
-                    aria-hidden="true"
-                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="1.8"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle cx="10.8" cy="10.8" r="6.8" />
-                    <path d="m16 16 4.5 4.5" />
-                  </svg>
-                  <input
-                    className="w-full rounded-lg border border-slate-800 bg-slate-950/70 py-3 pl-10 pr-4 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                    onChange={(event) => setHistorySearch(event.target.value)}
-                    placeholder="Buscar por descripción..."
-                    type="search"
-                    value={historySearch}
-                  />
-                </span>
-              </label>
+              <SavedExpenseInsights
+                formatCurrency={formatCurrency}
+                transactions={filteredTransactions}
+              />
 
               <div className="max-h-[28rem] overflow-auto rounded-xl border border-slate-800">
                 <table className="min-w-full divide-y divide-slate-800 text-left text-sm">
@@ -1051,10 +1991,13 @@ export default function DashboardPage() {
                       >
                         Monto
                       </th>
+                      <th className="px-4 py-3 text-right font-medium" scope="col">
+                        Acción
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 bg-slate-900">
-                    {filteredSavedTransactions.map((transaction, index) => (
+                    {filteredTransactions.map((transaction, index) => (
                       <tr
                         className="text-slate-300"
                         key={
@@ -1114,15 +2057,50 @@ export default function DashboardPage() {
                         >
                           {formatCurrency(Number(transaction.amount))}
                         </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <button
+                            aria-label={`Eliminar ${transaction.description}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition hover:border-rose-500/50 hover:bg-rose-500/10 hover:text-rose-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-wait disabled:opacity-50"
+                            disabled={
+                              deletingTransactionId === transaction.id ||
+                              transaction.id === undefined
+                            }
+                            onClick={() =>
+                              void handleDeleteTransaction(transaction)
+                            }
+                            type="button"
+                          >
+                            {deletingTransactionId === transaction.id ? (
+                              <span
+                                aria-label="Eliminando"
+                                className="h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-rose-400"
+                                role="status"
+                              />
+                            ) : (
+                              <svg
+                                aria-hidden="true"
+                                className="h-4 w-4"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.7"
+                                viewBox="0 0 24 24"
+                              >
+                                <path d="M3.5 6.5h17M9 6.5V4h6v2.5m3.5 0-.8 13.1a1.5 1.5 0 0 1-1.5 1.4H7.8a1.5 1.5 0 0 1-1.5-1.4L5.5 6.5m4 4v6m5-6v6" />
+                              </svg>
+                            )}
+                          </button>
+                        </td>
                       </tr>
                     ))}
-                    {filteredSavedTransactions.length === 0 && (
+                    {filteredTransactions.length === 0 && (
                       <tr>
                         <td
                           className="px-4 py-8 text-center text-sm text-slate-500"
-                          colSpan={5}
+                          colSpan={6}
                         >
-                          No hay movimientos que coincidan con la búsqueda.
+                          No hay movimientos que coincidan con los filtros.
                         </td>
                       </tr>
                     )}
@@ -1132,6 +2110,206 @@ export default function DashboardPage() {
             </>
           ) : null}
         </section>
+
+        {isManualFormOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !isSavingManual) {
+                setIsManualFormOpen(false);
+              }
+            }}
+          >
+            <section
+              aria-labelledby="manual-transaction-title"
+              aria-modal="true"
+              className="my-auto w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl shadow-black/50 sm:p-8"
+              role="dialog"
+            >
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-emerald-400">
+                    Registro manual
+                  </p>
+                  <h2
+                    className="mt-1 text-xl font-semibold text-white"
+                    id="manual-transaction-title"
+                  >
+                    Agregar movimiento
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Registra un gasto o ingreso en tu historial.
+                  </p>
+                </div>
+                <button
+                  aria-label="Cerrar formulario"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-700 text-slate-400 transition hover:border-slate-500 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:opacity-50"
+                  disabled={isSavingManual}
+                  onClick={() => setIsManualFormOpen(false)}
+                  type="button"
+                >
+                  <svg
+                    aria-hidden="true"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeWidth="1.8"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="m6 6 12 12M18 6 6 18" />
+                  </svg>
+                </button>
+              </div>
+
+              <form
+                className="space-y-4"
+                onSubmit={(event) =>
+                  void handleManualTransactionSubmit(event)
+                }
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                      Fecha
+                    </span>
+                    <input
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      onChange={(event) =>
+                        setManualTransaction((currentTransaction) => ({
+                          ...currentTransaction,
+                          date: event.target.value,
+                        }))
+                      }
+                      required
+                      type="date"
+                      value={manualTransaction.date}
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                      Tipo
+                    </span>
+                    <select
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      onChange={(event) =>
+                        setManualTransaction((currentTransaction) => ({
+                          ...currentTransaction,
+                          type:
+                            event.target.value === "INCOME"
+                              ? "INCOME"
+                              : "EXPENSE",
+                        }))
+                      }
+                      value={manualTransaction.type}
+                    >
+                      <option value="EXPENSE">Gasto</option>
+                      <option value="INCOME">Ingreso</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                    Descripción
+                  </span>
+                  <input
+                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                    maxLength={160}
+                    onChange={(event) =>
+                      setManualTransaction((currentTransaction) => ({
+                        ...currentTransaction,
+                        description: event.target.value,
+                      }))
+                    }
+                    placeholder="Ej. Compra de supermercado"
+                    required
+                    value={manualTransaction.description}
+                  />
+                </label>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                      Monto (CLP)
+                    </span>
+                    <input
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      min="1"
+                      onChange={(event) =>
+                        setManualTransaction((currentTransaction) => ({
+                          ...currentTransaction,
+                          amount: event.target.value,
+                        }))
+                      }
+                      placeholder="0"
+                      required
+                      step="1"
+                      type="number"
+                      value={manualTransaction.amount}
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1.5 block text-sm font-medium text-slate-300">
+                      Categoría
+                    </span>
+                    <select
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      onChange={(event) =>
+                        setManualTransaction((currentTransaction) => {
+                          const category = event.target.value;
+                          return {
+                            ...currentTransaction,
+                            category: isTransactionCategory(category)
+                              ? category
+                              : "Otros",
+                          };
+                        })
+                      }
+                      value={manualTransaction.category}
+                    >
+                      {TRANSACTION_CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                {manualFormError && (
+                  <p
+                    aria-live="polite"
+                    className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
+                    role="alert"
+                  >
+                    {manualFormError}
+                  </p>
+                )}
+
+                <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+                  <button
+                    className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:border-slate-500 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:opacity-50"
+                    disabled={isSavingManual}
+                    onClick={() => setIsManualFormOpen(false)}
+                    type="button"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    className="rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 disabled:cursor-wait disabled:opacity-60"
+                    disabled={isSavingManual}
+                    type="submit"
+                  >
+                    {isSavingManual ? "Guardando..." : "Guardar movimiento"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          </div>
+        )}
       </main>
     </div>
   );
